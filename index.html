@@ -1,0 +1,2523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英语课文圈选标记工具</title>
+    <style>
+        :root {
+            --bg-1: #0b3b32;
+            --bg-2: #1f7a63;
+            --bg-3: #74cbb0;
+            --card: rgba(255, 255, 255, 0.88);
+            --card-2: rgba(255, 255, 255, 0.72);
+            --text: #10403a;
+            --text-2: #2f7d6a;
+            --text-soft: #24564c;
+            --muted: #7aa89c;
+            --line: rgba(16,64,58,0.16);
+            --accent: #34d399;
+            --accent-2: #10b981;
+            --vocab: #ffe066;
+            --vocab-soft: #fff3b0;
+            --word: #b2f2bb;
+            --word-soft: #d3f9d8;
+            --sentence: #74c0fc;
+            --sentence-soft: #d0ebff;
+            --anno: #fda4af;
+            --radius: 22px;
+            --shadow: 0 18px 50px rgba(0,0,0,0.22);
+        }
+        [data-theme="sky"] {
+            --bg-1: #0c3a5e;
+            --bg-2: #1d6fa5;
+            --bg-3: #7cc6f0;
+            --text: #0c3556;
+            --text-2: #2a6b9e;
+            --text-soft: #1d4f77;
+            --muted: #7ba3c4;
+            --line: rgba(12,53,86,0.16);
+            --accent: #38bdf8;
+            --accent-2: #0ea5e9;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 45%, var(--bg-3) 100%);
+            background-attachment: fixed;
+            min-height: 100vh; color: var(--text);
+            overflow-x: hidden; overflow-y: auto;
+        }
+        header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 28px; flex-shrink: 0;
+        }
+        .brand { display: flex; align-items: center; gap: 12px; }
+        .logo {
+            width: 40px; height: 40px; border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            color: #fff; display: grid; place-items: center;
+            font-weight: 700; font-size: 18px;
+        }
+        .brand h1 { font-size: 17px; color: #fff; font-weight: 600; }
+        .brand p { font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 2px; }
+        .lesson-picker { display: flex; align-items: center; gap: 10px; }
+        .lesson-picker label { font-size: 12px; color: rgba(255,255,255,0.8); }
+        .lesson-picker select {
+            background: rgba(255,255,255,0.18); color: #fff;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 12px; padding: 9px 14px; font-size: 13px;
+            backdrop-filter: blur(10px); cursor: pointer;
+            max-width: 320px;
+        }
+        .lesson-picker select option { color: var(--text); }
+        .theme-switch { display: flex; align-items: center; gap: 8px; margin-left: 6px; }
+        .theme-dot {
+            width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+            border: 2px solid rgba(255,255,255,.65); transition: .2s; padding: 0;
+        }
+        .theme-dot[data-theme="mint"] { background: linear-gradient(135deg, #34d399, #74cbb0); }
+        .theme-dot[data-theme="sky"] { background: linear-gradient(135deg, #38bdf8, #7cc6f0); }
+        .theme-dot:hover { transform: scale(1.08); }
+        .theme-dot.active { border-color: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.35); transform: scale(1.1); }
+        .poster-btn {
+            padding: 9px 16px; border-radius: 12px; cursor: pointer;
+            border: 1px solid rgba(255,255,255,.35);
+            background: rgba(255,255,255,.18); color: #fff;
+            font-size: 13px; backdrop-filter: blur(10px); transition: .2s;
+        }
+        .poster-btn:hover { background: rgba(255,255,255,.3); }
+        .poster-btn.active { background: #fff; color: var(--text); border-color: #fff; }
+        .poster-layout { display: none; align-items: stretch; }
+        .poster-left {
+            flex: 0 0 55%; padding: 10px; background: #fff;
+            display: flex; align-items: center; justify-content: center;
+            border-right: 1px solid var(--line); overflow: hidden;
+        }
+        .poster-left img {
+            width: 100%; height: auto; max-height: 94vh;
+            object-fit: contain; border-radius: 8px;
+        }
+        .poster-right {
+            flex: 1; padding: 34px 38px; font-size: 19px; line-height: 1.9;
+            color: var(--text-soft); overflow-y: auto; max-height: 88vh;
+            background: rgba(255,255,255,.55);
+        }
+        .poster-right p { margin-bottom: 18px; }
+        .poster-fallback { font-size: 13px; color: var(--muted); padding: 40px 20px; line-height: 1.7; }
+        .lw-list { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+        .lw-item {
+            display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+            background: rgba(255,255,255,.55); border-radius: 10px;
+            font-size: 12.5px; cursor: pointer; transition: .15s;
+        }
+        .lw-item:hover { background: rgba(255,255,255,.85); }
+        .lw-en { font-weight: 600; color: var(--text); }
+        .lw-pos {
+            font-style: italic; font-size: 11px; color: var(--text-2);
+            background: var(--line); padding: 1px 6px; border-radius: 6px;
+        }
+        .lw-cn {
+            color: var(--text-soft); flex: 1; overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap;
+        }
+        .lw-add {
+            border: none; background: var(--accent); color: #fff;
+            width: 20px; height: 20px; border-radius: 50%;
+            cursor: pointer; font-size: 13px; line-height: 1; flex-shrink: 0;
+        }
+        .lw-add:hover { background: var(--accent-2); }
+        @media (max-width: 1100px) {
+            .poster-layout { flex-direction: column; }
+            .poster-left { border-right: none; border-bottom: 1px solid var(--line); }
+            .poster-right { max-height: none; }
+        }
+        .app {
+            display: flex; gap: 20px; align-items: flex-start;
+            padding: 0 28px 32px; max-width: 1400px; margin: 0 auto; width: 100%;
+        }
+        .main-card {
+            flex: 1; background: var(--card); border-radius: var(--radius);
+            box-shadow: var(--shadow); display: flex; flex-direction: column;
+            overflow: hidden; border: 1px solid rgba(255,255,255,0.4); min-width: 0;
+        }
+        .toolbar {
+            display: flex; gap: 10px; padding: 14px 20px; flex-wrap: wrap;
+            border-bottom: 1px solid var(--line); flex-shrink: 0;
+            background: rgba(255,255,255,0.5);
+        }
+        .tool-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 8px 14px; border-radius: 12px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,0.7); color: var(--text);
+            font-size: 13px; cursor: pointer; transition: .2s; user-select: none;
+        }
+        .tool-btn:hover { background: #fff; transform: translateY(-1px); }
+        .tool-btn.active { background: var(--accent); color: #fff; border-color: var(--accent-2); }
+        .tool-btn.erase.active { background: #495057; color: #fff; border-color: #343a40; }
+        .tool-btn .dot { width: 9px; height: 9px; border-radius: 50%; }
+        .image-area {
+            height: 520px; min-height: 520px; display: flex;
+            align-items: center; justify-content: center;
+            background: #ffffff;
+            position: relative; flex-shrink: 0; padding: 12px;
+        }
+        .image-area img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .stage-wrap { position: relative; }
+        .stage {
+            position: relative; padding: 32px 44px;
+            font-size: 21px; line-height: 1.85; color: var(--text-soft);
+        }
+        .stage.drawing { cursor: crosshair; }
+        .stage.sticky { cursor: copy; }
+        .stage.erase { cursor: not-allowed; }
+        .body-text { white-space: pre-wrap; position: relative; z-index: 1; }
+        .body-text span { border-radius: 6px; padding: 2px 4px; cursor: pointer; transition: .15s; }
+        .body-text span.vocab { background: linear-gradient(120deg, var(--vocab-soft), var(--vocab)); box-shadow: 0 2px 0 rgba(255,193,7,.3); }
+        .body-text span.word { background: linear-gradient(120deg, var(--word-soft), var(--word)); box-shadow: 0 2px 0 rgba(40,167,69,.25); }
+        .body-text span.sentence { border: 2px dashed var(--sentence); background: var(--sentence-soft); border-radius: 8px; }
+        .body-text span.erasable:hover { outline: 2px solid #ff6b6b; outline-offset: 1px; }
+        .anno-layer { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+        .anno-layer.enabled { pointer-events: auto; }
+        .anno-circle {
+            position: absolute; border: 2.5px solid var(--anno); border-radius: 50%;
+            background: rgba(253,164,175,.10); pointer-events: auto; cursor: pointer;
+        }
+        .anno-circle.erasable:hover { background: rgba(255,107,107,.25); }
+        .anno-sticky {
+            position: absolute; min-width: 130px; max-width: 210px;
+            background: #fff7ed; border: 1px solid #fed7aa; border-radius: 12px;
+            padding: 10px 12px; box-shadow: 0 6px 18px rgba(0,0,0,.12);
+            font-size: 13px; color: #92400e; pointer-events: auto; cursor: grab;
+        }
+        .anno-sticky:active { cursor: grabbing; }
+        .anno-sticky.erasable:hover { outline: 2px solid #ff6b6b; }
+        .selection-popup {
+            position: absolute; display: none; background: #fff; border-radius: 14px;
+            box-shadow: 0 10px 40px rgba(0,0,0,.18); padding: 8px; gap: 6px; z-index: 30;
+            border: 1px solid rgba(0,0,0,.06);
+        }
+        .selection-popup button {
+            border: none; background: transparent; padding: 7px 11px; border-radius: 10px;
+            font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 5px; color: var(--text);
+        }
+        .selection-popup button:hover { background: #f3f4f6; }
+        .selection-popup .dot { width: 10px; height: 10px; border-radius: 50%; }
+        .sidebar {
+            width: 370px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0;
+            position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto;
+        }
+        .side-panel {
+            background: var(--card-2); border-radius: var(--radius); padding: 18px;
+            box-shadow: var(--shadow); border: 1px solid rgba(255,255,255,.35);
+            backdrop-filter: blur(16px); flex-shrink: 0;
+        }
+        .panel-title {
+            font-size: 14px; font-weight: 700; margin-bottom: 12px;
+            display: flex; align-items: center; gap: 8px; color: var(--text);
+        }
+        .panel-title .bar { width: 4px; height: 14px; border-radius: 2px; background: var(--accent); }
+        .legend { display: flex; flex-direction: column; gap: 8px; }
+        .legend-item { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: #4a352b; }
+        .legend-color { width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; }
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-top: 12px; }
+        .stat-card {
+            background: rgba(255,255,255,.55); border-radius: 12px; padding: 11px 6px;
+            text-align: center; border: 1px solid rgba(255,255,255,.4);
+        }
+        .stat-num { font-size: 20px; font-weight: 700; color: var(--text); }
+        .stat-label { font-size: 10.5px; color: var(--muted); margin-top: 3px; }
+        .word-list { max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 9px; }
+        .word-card {
+            background: rgba(255,255,255,.6); border-radius: 14px; padding: 11px 13px;
+            border-left: 4px solid var(--vocab); font-size: 13px;
+        }
+        .word-card.t-word { border-left-color: var(--word); }
+        .word-card.t-sentence { border-left-color: var(--sentence); }
+        .word-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 5px; }
+        .word-en { font-weight: 700; font-size: 14px; color: var(--text); }
+        .word-pos {
+            font-size: 11px; background: var(--line); color: var(--text-2);
+            padding: 1px 7px; border-radius: 6px; font-style: italic;
+        }
+        .word-cn { color: var(--text-soft); font-size: 13px; }
+        .word-affix {
+            margin-top: 6px; font-size: 11.5px; color: #7a6255; line-height: 1.55;
+            background: rgba(255,255,255,.5); border-radius: 8px; padding: 6px 8px;
+        }
+        .word-affix b { color: var(--text-2); font-weight: 600; }
+        .empty-hint { font-size: 12.5px; color: var(--muted); text-align: center; padding: 20px 0; }
+        .detail-box {
+            background: rgba(255,255,255,.75); border: 2px solid rgba(255,143,163,.35);
+            border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; min-height: 130px;
+        }
+        .detail-word { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1.2; }
+        .detail-pos {
+            display: inline-block; margin-left: 8px; font-size: 12px; font-style: italic;
+            background: rgba(107,76,58,.14); color: var(--text-2); padding: 2px 9px; border-radius: 7px;
+        }
+        .detail-row { margin-top: 9px; font-size: 13px; line-height: 1.6; color: var(--text-soft); }
+        .detail-row b {
+            display: inline-block; min-width: 62px; color: var(--muted); font-weight: 600; font-size: 12px;
+        }
+        .detail-tag {
+            display: inline-block; margin-top: 8px; font-size: 11px; padding: 2px 9px;
+            border-radius: 20px; background: rgba(255,143,163,.2); color: #c2417a;
+        }
+        .detail-short { font-size: 13px; color: var(--muted); margin-top: 8px; }
+        .export-actions { display: flex; gap: 9px; margin-top: 12px; }
+        .export-actions button {
+            flex: 1; padding: 9px; border-radius: 11px; border: 1px solid rgba(255,255,255,.5);
+            background: rgba(255,255,255,.6); font-size: 12px; cursor: pointer; transition: .2s; color: var(--text);
+        }
+        .export-actions button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .export-actions button:hover { transform: translateY(-1px); }
+        .login-overlay {
+            position: fixed; inset: 0; z-index: 500; display: none;
+            align-items: flex-start; justify-content: center; padding: 26px;
+            overflow-y: auto;
+            background: linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 45%, var(--bg-3) 100%);
+        }
+        .home-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+            max-width: 1180px; width: 100%; align-items: stretch; margin: 0 auto;
+        }
+        .home-grid .login-card {
+            width: 100%; max-width: 100%;
+            display: flex; flex-direction: column; justify-content: center;
+        }
+        .home-grid .module-card { display: flex; flex-direction: column; }
+        .home-grid .rank-list { flex: 1; max-height: none; }
+        .home-grid .shop-card { grid-column: 1 / -1; }
+        @media (max-width: 900px) { .home-grid { grid-template-columns: 1fr; } }
+        .login-card {
+            width: 430px; max-width: 94vw; text-align: center;
+            background: rgba(255,255,255,.95); border-radius: 26px;
+            padding: 34px 36px 30px; box-shadow: 0 24px 70px rgba(0,0,0,.35);
+        }
+        .login-logo {
+            width: 60px; height: 60px; border-radius: 18px; margin: 0 auto 14px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            color: #fff; display: grid; place-items: center;
+            font-size: 26px; font-weight: 700;
+        }
+        .login-card h2 { font-size: 21px; color: var(--text); font-weight: 700; }
+        .login-card > p { font-size: 13px; color: var(--muted); margin: 6px 0 20px; }
+        .role-options { display: flex; gap: 12px; margin-bottom: 18px; }
+        .role-card {
+            flex: 1; padding: 18px 10px; border-radius: 18px; cursor: pointer;
+            border: 2px solid var(--line); background: rgba(255,255,255,.7);
+            transition: .2s; user-select: none;
+        }
+        .role-card:hover { transform: translateY(-2px); }
+        .role-card .role-icon { font-size: 28px; display: block; margin-bottom: 6px; }
+        .role-card .role-name { font-size: 15px; font-weight: 600; color: var(--text); }
+        .role-card .role-desc { font-size: 11.5px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+        .role-card.active {
+            border-color: var(--accent); background: rgba(255,255,255,1);
+            box-shadow: 0 6px 20px rgba(0,0,0,.12);
+        }
+        .login-card input {
+            width: 100%; padding: 11px 14px; border-radius: 12px; font-size: 14px;
+            border: 1px solid var(--line); background: #fff; color: var(--text);
+            margin-bottom: 16px; font-family: inherit;
+        }
+        .login-btn {
+            width: 100%; padding: 12px; border-radius: 14px; border: none;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; transition: .2s;
+        }
+        .login-btn:hover { filter: brightness(1.05); }
+        .user-badge {
+            padding: 8px 14px; border-radius: 20px; cursor: pointer; font-size: 12.5px;
+            background: rgba(255,255,255,.2); color: #fff;
+            border: 1px solid rgba(255,255,255,.35); backdrop-filter: blur(10px);
+            white-space: nowrap;
+        }
+        .user-badge:hover { background: rgba(255,255,255,.32); }
+        .ts-row {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 12.5px; padding: 8px 10px; border-radius: 9px;
+            background: rgba(255,255,255,.55); margin-bottom: 6px; color: var(--text-soft);
+        }
+        .ts-row b { color: var(--text); }
+
+        .toast {
+            position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%) translateY(90px);
+            background: rgba(45,27,20,.92); color: #fff; padding: 11px 22px; border-radius: 30px;
+            font-size: 13.5px; opacity: 0; transition: .3s; pointer-events: none; z-index: 200;
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+        @media (max-width: 1100px) {
+            .app { flex-direction: column; overflow: auto; }
+            .sidebar { width: 100%; }
+        }
+
+        /* ===== 左侧三大模块：登录 / 排行榜 / 皮肤商店 ===== */
+        .modules {
+            width: 300px; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px;
+            position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto;
+        }
+        .module-card {
+            background: var(--card); border-radius: var(--radius); padding: 16px 18px;
+            box-shadow: var(--shadow); border: 1px solid rgba(255,255,255,.4);
+        }
+        .module-head { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:700; color:var(--text); margin-bottom:12px; }
+        .module-head .mi { font-size:18px; }
+        .login-card select {
+            width:100%; padding:11px 14px; border-radius:12px; font-size:14px;
+            border:1px solid var(--line); background:#fff; color:var(--text);
+            margin-bottom:16px; font-family:inherit;
+        }
+        .login-entry {
+            display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:14px;
+            background:rgba(255,255,255,.6); cursor:pointer; border:1px dashed var(--line); transition:.2s;
+        }
+        .login-entry:hover { background:#fff; border-color:var(--accent); }
+        .avatar-big {
+            width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-size:24px;
+            background:linear-gradient(135deg,var(--accent),var(--accent-2)); flex-shrink:0;
+        }
+        .le-name { font-size:14px;font-weight:600;color:var(--text); }
+        .le-sub { font-size:11.5px;color:var(--muted);margin-top:2px; }
+        .points-pill {
+            display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;
+            color:#78350f;background:linear-gradient(135deg,#fde68a,#fcd34d);
+            padding:3px 10px;border-radius:20px;margin-top:6px;
+        }
+        .rank-list { display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto; }
+        .rank-row { display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.62);border:1px solid transparent; }
+        .rank-row.me { border-color:var(--accent);background:#fff; }
+        .rank-no { width:26px;font-weight:800;font-size:13px;color:var(--muted);text-align:center;flex-shrink:0; }
+        .rank-av { width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:18px;background:#fff;flex-shrink:0; }
+        .rank-info { flex:1;min-width:0; }
+        .rank-name { font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        .rank-grade { font-size:11px;color:var(--muted); }
+        .rank-pts { font-size:14px;font-weight:800;color:var(--accent-2);flex-shrink:0; }
+        .rank-badges { display:flex;gap:4px;flex-wrap:wrap;margin-top:3px; }
+        .rb { font-size:10.5px;padding:2px 7px;border-radius:20px;white-space:nowrap; }
+        .rb-gold { background:linear-gradient(135deg,#fde68a,#fbbf24);color:#78350f; }
+        .rb-top5 { background:linear-gradient(135deg,#dbeafe,#93c5fd);color:#1e3a8a; }
+        .rb-top10 { background:linear-gradient(135deg,#dcfce7,#86efac);color:#14532d; }
+        .rank-empty { font-size:12px;color:var(--muted);text-align:center;padding:14px 0; }
+        .mod-btn {
+            width:100%;padding:10px;border-radius:12px;border:none;cursor:pointer;
+            background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;
+            font-size:13px;font-weight:600;font-family:inherit;margin-top:10px;transition:.2s;
+        }
+        .mod-btn:hover { filter:brightness(1.06); }
+        .mod-btn.ghost { background:rgba(255,255,255,.7);color:var(--text);border:1px solid var(--line); }
+        .modal-overlay {
+            position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;
+            align-items:center;justify-content:center;z-index:300;padding:20px;
+        }
+        .modal {
+            background:#fff;border-radius:24px;width:620px;max-width:94vw;max-height:88vh;
+            overflow-y:auto;padding:24px 26px;box-shadow:0 24px 70px rgba(0,0,0,.35);
+        }
+        .modal h3 { font-size:17px;color:var(--text);margin-bottom:4px; }
+        .m-sub { font-size:12px;color:var(--muted);margin-bottom:16px; }
+        .modal-tabs { display:flex;gap:10px;margin-bottom:16px; }
+        .modal-tab {
+            flex:1;padding:11px;border-radius:14px;cursor:pointer;text-align:center;
+            border:2px solid var(--line);background:rgba(255,255,255,.7);
+            font-size:13.5px;font-weight:600;color:var(--text-2);
+        }
+        .modal-tab.active { border-color:var(--accent);background:#fff;color:var(--text); }
+        .skin-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:12px; }
+        .skin-card { border:2px solid var(--line);border-radius:16px;padding:12px;text-align:center;background:rgba(255,255,255,.8);transition:.2s; }
+        .skin-card.owned { border-color:var(--accent); }
+        .skin-card.using { border-color:var(--accent);background:#fff;box-shadow:0 6px 18px rgba(0,0,0,.1); }
+        .skin-prev { height:64px;border-radius:12px;margin-bottom:8px;display:grid;place-items:center;font-size:30px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06); }
+        .skin-name { font-size:12.5px;font-weight:600;color:var(--text); }
+        .skin-price { font-size:11.5px;color:#b45309;margin:6px 0 8px;font-weight:700; }
+        .skin-buy {
+            width:100%;padding:7px;border-radius:10px;border:none;cursor:pointer;font-size:12px;
+            font-family:inherit;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;font-weight:600;
+        }
+        .skin-buy.owned { background:rgba(255,255,255,.92);color:var(--accent-2);border:1px solid var(--accent); }
+        .quiz-q { font-size:22px;font-weight:700;color:var(--text);margin:12px 0 6px; }
+        .quiz-hint { font-size:12px;color:var(--muted);margin-bottom:12px; }
+        .quiz-opt {
+            display:block;width:100%;text-align:left;padding:11px 14px;border-radius:12px;
+            border:2px solid var(--line);background:rgba(255,255,255,.85);cursor:pointer;
+            font-size:14px;color:var(--text);font-family:inherit;margin-bottom:9px;transition:.15s;
+        }
+        .quiz-opt:hover { border-color:var(--accent); }
+        .quiz-done { text-align:center;padding:10px 0; }
+        .quiz-score { font-size:34px;font-weight:800;color:var(--accent-2); }
+        @media (max-width: 1100px) { .modules { width:100%; position:static; max-height:none; } }
+
+        .en-def {
+            display: block; font-size: 14px; line-height: 1.75; color: var(--text-soft); margin-top: 3px;
+        }
+        .syn-ant { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+        .syn-ant b {
+            font-size: 11.5px; font-weight: 600; padding: 2px 10px; border-radius: 20px;
+            background: rgba(52,211,153,.18); color: #0f766e;
+        }
+        .syn-ant i {
+            font-style: normal; font-size: 11.5px; padding: 2px 10px; border-radius: 20px;
+            background: rgba(248,113,113,.16); color: #b91c1c;
+        }
+
+        /* ===== 设置（悬浮按钮 + 滑块面板） ===== */
+        .fab-settings {
+            position: fixed; right: 26px; bottom: 26px; z-index: 350;
+            width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            box-shadow: 0 10px 26px rgba(0,0,0,.28);
+            display: grid; place-items: center; transition: .25s; padding: 0;
+        }
+        .fab-settings:hover { transform: scale(1.08); }
+        .fab-settings svg { transition: .3s; }
+        .fab-settings:hover svg { transform: rotate(90deg); }
+        .fab-settings.active { box-shadow: 0 0 0 5px rgba(255,255,255,.35), 0 10px 26px rgba(0,0,0,.28); }
+        .set-row { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; font-size: 12.5px; color: var(--text-2); }
+        .set-row label { width: 76px; flex-shrink: 0; }
+        .set-row input[type=range] { flex: 1; min-width: 0; }
+        .set-row span { width: 86px; text-align: right; font-size: 11.5px; color: var(--muted); flex-shrink: 0; }
+        .sp-close { margin-left: auto; border: none; background: transparent; cursor: pointer; font-size: 15px; color: var(--muted); padding: 0 2px; }
+        .set-note { font-size: 11.5px; color: var(--muted); text-align: center; margin-top: 4px; line-height: 1.6; }
+
+        /* 近义词 / 反义词的单词 + 例句 */
+        .ex-line { font-size: 12.5px; line-height: 1.65; color: var(--text-soft); margin-top: 5px; }
+        .ex-line b {
+            display: inline-block; font-size: 11.5px; font-weight: 600; padding: 1px 9px;
+            border-radius: 20px; margin-right: 7px;
+        }
+        .ex-line.syn b { background: rgba(52,211,153,.18); color: #0f766e; }
+        .ex-line.ant b { background: rgba(248,113,113,.16); color: #b91c1c; }
+
+        /* 日期时间 */
+        .datetime {
+            font-size: 13px; color: #fff; white-space: nowrap;
+            background: rgba(255,255,255,.18); padding: 7px 14px; border-radius: 12px;
+            border: 1px solid rgba(255,255,255,.32); backdrop-filter: blur(10px);
+            font-variant-numeric: tabular-nums;
+        }
+        </style>
+</head>
+<body>
+    <div class="login-overlay" id="loginOverlay">
+        <div class="home-grid">
+        <div class="login-card">
+            <div class="login-logo">A</div>
+            <h2>英语课文学习平台</h2>
+            <p>请选择你的身份后进入</p>
+            <div class="role-options">
+                <div class="role-card" data-role="student" onclick="selectRole('student')">
+                    <span class="role-icon">🎓</span>
+                    <div class="role-name">学生版</div>
+                    <div class="role-desc">阅读课文<br>标记生词 · 生成词表</div>
+                </div>
+                <div class="role-card" data-role="teacher" onclick="selectRole('teacher')">
+                    <span class="role-icon">👩‍🏫</span>
+                    <div class="role-name">老师版</div>
+                    <div class="role-desc">查看全班统计<br>导出全部生词表</div>
+                </div>
+            </div>
+            <select id="savedAccounts" onchange="pickAccount(this.value)">
+                <option value="">— 登录以前账号（可选）—</option>
+            </select>
+            <input type="text" id="userName" placeholder="请输入姓名（或上方选择已注册账号）" onkeydown="if(event.key==='Enter')document.getElementById('userPwd').focus()">
+            <input type="password" id="userPwd" placeholder="请输入密码（至少 4 位）" onkeydown="if(event.key==='Enter')document.getElementById('userGrade').focus()">
+            <select id="userGrade">
+                <option value="">请选择年级</option>
+                <option>一年级</option><option>二年级</option><option>三年级</option>
+                <option>四年级</option><option>五年级</option><option>六年级</option>
+                <option>七年级</option><option>八年级</option><option>九年级</option>
+            </select>
+            <button class="login-btn" onclick="doLogin()">进入学习</button>
+            <div id="homeUser" style="font-size:12px;color:var(--muted);margin-top:10px"></div>
+        </div>
+
+            <div class="module-card">
+                <div class="module-head"><span class="mi">🏆</span>排行榜
+                    <span style="font-weight:400;font-size:11.5px;color:var(--muted)">（积分从高到低）</span></div>
+                <div class="rank-list" id="rankList"></div>
+                <button class="mod-btn" onclick="startQuiz()">📝 答题赚积分</button>
+            </div>
+
+            <div class="module-card shop-card">
+                <div class="module-head"><span class="mi">🎨</span>皮肤商店</div>
+                <div style="font-size:12px;color:var(--muted);line-height:1.6">
+                    用积分兑换背景皮肤 / 头像皮肤 · 价格 10 / 50 / 100 积分
+                </div>
+                <button class="mod-btn" onclick="openSkinShop()">🛍 打开皮肤商店</button>
+                <button class="mod-btn ghost" id="resumeBtn" style="display:none" onclick="closeHome()">▶ 返回学习</button>
+                <div id="mySkins"></div>
+                <button class="mod-btn ghost" style="margin-top:10px" onclick="backupData()">💾 备份进度（排名/积分/皮肤）</button>
+                <button class="mod-btn ghost" style="margin-top:8px" onclick="document.getElementById('restoreFile').click()">📂 恢复进度</button>
+                <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="restoreData(this)">
+                <div id="saveInfo" style="font-size:11.5px;color:var(--muted);text-align:center;margin-top:8px"></div>
+            </div>
+        </div>
+    </div>
+
+    <header>
+        <div class="brand">
+            <div class="logo">A</div>
+            <div>
+                <h1>英语课文圈选标记工具</h1>
+                <p>文字标记 · 圈选标注 · 便签 · 生词解析</p>
+            </div>
+            <div class="login-entry" id="loginEntry" onclick="openLogin()" title="点击登录 / 切换账号">
+                <div class="avatar-big" id="entryAvatar">🙂</div>
+                <div>
+                    <div class="le-name" id="entryName">未登录 · 点击登录</div>
+                    <div class="le-sub" id="entrySub">身份 · 姓名 · 密码 · 年级</div>
+                </div>
+            </div>
+        </div>
+        <div class="lesson-picker">
+            <div class="datetime" id="datetime">—</div>
+            <div class="user-badge" id="userBadge" onclick="logout()" title="点击切换身份">未登录</div>
+            <button class="poster-btn" onclick="openSkinShop()" title="打开皮肤商店">🎨 皮肤商店</button>
+            <button class="poster-btn" onclick="goHome()" title="返回首页（排行榜 / 皮肤商店）">🏠 首页</button>
+            <button class="poster-btn" onclick="startQuiz()" title="答题赚积分">📝 答题</button>
+            <button class="poster-btn" onclick="logout()" title="返回登录界面">↩ 返回登录</button>
+            <button class="poster-btn" id="posterBtn" onclick="togglePoster()">🖼 海报模式</button>
+            <button class="poster-btn" onclick="document.getElementById('lessonFile').click()">📥 导入课文</button>
+            <input type="file" id="lessonFile" multiple accept=".txt,.text,.md" style="display:none" onchange="importLessons(this)">
+            <label for="lessonSelect">课文选择</label>
+            <select id="lessonSelect" onchange="switchLesson(parseInt(this.value))"></select>
+            <div class="theme-switch">
+                <button class="theme-dot" data-theme="mint" title="薄荷绿" onclick="setTheme('mint')"></button>
+                <button class="theme-dot" data-theme="sky" title="天空蓝" onclick="setTheme('sky')"></button>
+            </div>
+        </div>
+    </header>
+
+    <div class="app">
+        <main class="main-card">
+            <div class="image-area" id="normalView">
+                <img id="lessonImg" src="" alt="" onload="paintBackdrop(this)">
+            </div>
+            <div class="poster-layout" id="posterLayout">
+                <div class="poster-left">
+                    <img id="posterImg" src="" alt="" onload="onPosterLoad();paintBackdrop(this)" onerror="onPosterError()">
+                </div>
+                <div class="poster-right" id="posterText"></div>
+            </div>
+            <div class="stage-wrap" id="normalText">
+                <div class="stage" id="stage" onmousedown="onStageDown(event)">
+                    <div class="anno-layer" id="annoLayer"></div>
+                    <div class="body-text" id="articleBody" onmouseup="onTextSelect(event)"></div>
+                </div>
+                <div class="selection-popup" id="popup">
+                    <button onclick="addMark('vocab')"><span class="dot" style="background:var(--vocab)"></span>生词</button>
+                    <button onclick="addMark('word')"><span class="dot" style="background:var(--word)"></span>好词</button>
+                    <button onclick="addMark('sentence')"><span class="dot" style="background:var(--sentence)"></span>好句</button>
+                </div>
+            </div>
+        </main>
+
+        <aside class="sidebar">
+            <div id="sidebarContent">
+            <div class="side-panel">
+                <div class="panel-title"><span class="bar"></span>标记工作区</div>
+                <div class="toolbar" style="padding:0;border:none;background:transparent">
+                    <button class="tool-btn active" data-mode="text" onclick="setMode('text')">
+                        <span class="dot" style="background:#6366f1"></span>文字标记
+                    </button>
+                    <button class="tool-btn" data-mode="circle" onclick="setMode('circle')">
+                        <span class="dot" style="background:#f43f5e"></span>圈选标注
+                    </button>
+                    <button class="tool-btn" data-mode="sticky" onclick="setMode('sticky')">
+                        <span class="dot" style="background:#f97316"></span>添加便签
+                    </button>
+                    <button class="tool-btn erase" data-mode="erase" onclick="setMode('erase')">
+                        <span class="dot" style="background:#495057"></span>删除标注
+                    </button>
+                </div>
+            </div>
+            <div class="side-panel">
+                <div class="panel-title"><span class="bar"></span>标记说明与统计</div>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-color" style="background:linear-gradient(120deg,var(--vocab-soft),var(--vocab))"></div>生词（黄色荧光笔）</div>
+                    <div class="legend-item"><div class="legend-color" style="background:linear-gradient(120deg,var(--word-soft),var(--word))"></div>好词（绿色）</div>
+                    <div class="legend-item"><div class="legend-color" style="background:var(--sentence-soft);border:2px dashed var(--sentence)"></div>好句（蓝色虚线框）</div>
+                    <div class="legend-item"><div class="legend-color" style="border:2px solid var(--anno);border-radius:50%"></div>圈选 / 便签（标注层）</div>
+                </div>
+                <div class="stats">
+                    <div class="stat-card"><div class="stat-num" id="statVocab">0</div><div class="stat-label">生词</div></div>
+                    <div class="stat-card"><div class="stat-num" id="statWord">0</div><div class="stat-label">好词好句</div></div>
+                    <div class="stat-card"><div class="stat-num" id="statAnno">0</div><div class="stat-label">圈选/便签</div></div>
+                </div>
+            </div>
+            <div class="side-panel">
+                <div class="panel-title"><span class="bar"></span>单词详解 <span style="font-weight:400;color:var(--muted);font-size:11px">（4 个字母以上单词）</span></div>
+                <div class="detail-box" id="detailBox"></div>
+                <div class="panel-title" style="margin-top:6px"><span class="bar"></span>生词内容 <span style="font-weight:400;color:var(--muted);font-size:11px">（点击词条查看详情）</span></div>
+                <div class="word-list" id="wordList"></div>
+                <div class="export-actions">
+                    <button class="primary" onclick="saveNow()">💾 保存</button>
+                    <button onclick="exportVocab()">导出生词表</button>
+                </div>
+                <div class="export-actions">
+                    <button onclick="clearAll()">清空当前</button>
+                </div>
+            </div>
+            <div class="side-panel" id="teacherPanel" style="display:none">
+                <div class="panel-title"><span class="bar"></span>教学面板 <span style="font-weight:400;color:var(--muted);font-size:11px">（老师版）</span></div>
+                <div id="teacherStats"></div>
+                <div class="export-actions">
+                    <button class="primary" onclick="exportAllLessons()">导出全部课文生词表</button>
+                </div>
+            </div>
+            <div class="side-panel">
+                <div class="panel-title"><span class="bar"></span>本课词汇 <span style="font-weight:400;color:var(--muted);font-size:11px">（自动提取 ≥4 字母单词）</span></div>
+                <div class="lw-list" id="lessonWordList"></div>
+                <div class="export-actions">
+                    <button class="primary" onclick="addAllWords()">全部加入生词表</button>
+                </div>
+            </div>
+            </div>
+
+            <div id="settingsView" style="display:none">
+                <div class="side-panel">
+                    <div class="panel-title"><span class="bar"></span>设置
+                        <button class="sp-close" onclick="toggleSettings()" title="关闭设置">✕</button>
+                    </div>
+                    <div class="set-row">
+                        <label>字体大小</label>
+                        <input type="range" id="setFontSize" min="1" max="200" value="100" oninput="onSetting()">
+                        <span id="valFontSize">100</span>
+                    </div>
+                    <div class="set-row">
+                        <label>字体颜色</label>
+                        <input type="range" id="setFontColor" min="1" max="200" value="100" oninput="onSetting()">
+                        <span id="valFontColor">100</span>
+                    </div>
+                    <div class="set-row">
+                        <label>字体透明度</label>
+                        <input type="range" id="setFontOpacity" min="1" max="200" value="100" oninput="onSetting()">
+                        <span id="valFontOpacity">100%</span>
+                    </div>
+                    <div class="set-row">
+                        <label>字体样式</label>
+                        <input type="range" id="setFontStyle" min="1" max="200" value="100" oninput="onSetting()">
+                        <span id="valFontStyle">100</span>
+                    </div>
+                    <div class="set-row">
+                        <label>背景透明度</label>
+                        <input type="range" id="setBgOpacity" min="1" max="200" value="100" oninput="onSetting()">
+                        <span id="valBgOpacity">100%</span>
+                    </div>
+                    <div class="set-note">拖动滑块即时生效 · 设置自动保存，刷新后保留</div>
+                </div>
+            </div>
+        </aside>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <button class="fab-settings" id="settingsFab" onclick="toggleSettings()" title="设置">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+    </button>
+
+    <div class="modal-overlay" id="skinModal" onclick="if(event.target===this)closeModal('skinModal')">
+        <div class="modal">
+            <h3>🎨 皮肤商店</h3>
+            <div class="m-sub">当前积分：<b id="shopPoints">0</b> · 用积分兑换，购买后与账号绑定</div>
+            <div class="modal-tabs">
+                <div class="modal-tab active" id="tabBg" onclick="showSkinTab('bg')">🎆 背景皮肤</div>
+                <div class="modal-tab" id="tabAv" onclick="showSkinTab('avatar')">😀 头像皮肤</div>
+            </div>
+            <div class="skin-grid" id="skinGrid"></div>
+            <button class="mod-btn ghost" onclick="closeModal('skinModal')">关闭</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="quizModal" onclick="if(event.target===this)closeModal('quizModal')">
+        <div class="modal" style="width:520px">
+            <h3>📝 单词答题</h3>
+            <div class="m-sub">答对一题 +10 积分，积分用于排行榜排名与皮肤兑换</div>
+            <div id="quizBody"></div>
+            <button class="mod-btn ghost" onclick="closeModal('quizModal')">关闭</button>
+        </div>
+    </div>
+
+
+
+    <script>
+        const lessons = [
+            { id:0, title:"The Lost Kite", subtitle:"丢失的风筝", img:"images/lesson1.jpg",
+              body:`One sunny afternoon, Leo and his sister Maya went to the park to fly their new kite. It was red and blue, with a long tail that danced in the wind. "Hold it tight!" shouted Maya as she ran. But the string slipped from her hand. The kite flew higher and higher until it disappeared behind the trees.\n\n"Oh no! We lost it," said Leo, feeling upset. They looked everywhere – under the bench, near the pond, even behind the bushes. Just when they were about to give up, an old man called out, "Is this yours?" He held the kite, which had landed softly on his garden.\n\n"Thank you so much!" said Maya. The man smiled and said, "Next time, tie a knot. That will keep it safe."\n\nLeo learned something important that day: sometimes help comes from someone you don't know. And a simple knot can make all the difference.` },
+            { id:1, title:"The Night Before the Test", subtitle:"考试前夜", img:"images/lesson2.jpg", poster:"images/poster2.jpg",
+              body:`Emma sat at her desk, looking at her math book. Her eyes felt heavy. She had studied for hours, but she still didn't feel ready.\n\nHer mother came in with a glass of warm milk. "You need to rest, Emma. Your brain works better after sleep."\n\n"But I'm worried," said Emma. "What if I forget everything?"\n\n"Then you will do your best, and that's enough," her mother said gently.\n\nEmma closed her book and took a deep breath. She thought about all the problems she had solved that week. Maybe she knew more than she thought.\n\nThe next morning, she walked into class feeling calm. When the test began, she read each question carefully. She remembered the formulas and worked step by step. At the end, she smiled. She had done her best – and that was truly enough.` },
+            { id:2, title:"The Little Seed's Journey", subtitle:"小种子的旅程", img:"images/lesson3.jpg",
+              body:`A tiny seed lay under the ground. It was dark and cold. "I want to see the sun," it whispered. Day after day, it pushed its way through the soil. First, a small root grew down. Then a green shoot reached up.\n\nRain fell and gave it a drink. The sun warmed its leaves. Slowly, the seed became a little plant. Birds sang above it. Butterflies visited its flowers.\n\n"Look how tall I am now!" said the plant one morning. It had grown into a beautiful sunflower, turning its face toward the sky.\n\nThe other plants around it nodded. "You never gave up," they said. "That is why you are here today."\n\nAnd the sunflower smiled, knowing that every journey begins with a single step – or in its case, a single seed.` },
+            { id:3, title:"How Do Bees Make Honey?", subtitle:"蜜蜂如何酿蜜？", img:"images/lesson4.jpg", poster:"images/poster4.jpg",
+              body:`Have you ever wondered where honey comes from? It doesn't just appear in jars. It takes many bees working together to make it.\n\nFirst, worker bees fly out to find flowers. They use their long tongues to drink sweet juice called nectar. Each bee can visit up to 1,000 flowers in one day! They store the nectar in a special part of their body called a honey stomach.\n\nWhen the bee returns to the hive, it passes the nectar to another bee. This bee chews the nectar for about 30 minutes. During this time, special chemicals in the bee's mouth change the nectar into honey.\n\nThen, the honey is placed into small wax cells. The bees fan their wings to dry it. Finally, they cover the cells with wax to keep the honey fresh.\n\nA single bee makes only about one-twelfth of a teaspoon of honey in its whole life. So every spoonful of honey is the result of thousands of trips to flowers.` },
+            { id:4, title:"Why Do We Have Seasons?", subtitle:"为什么会有四季？", img:"images/lesson5.jpg",
+              body:`If you live in a place like China, you know that winter is cold and summer is hot. But have you ever asked yourself why?\n\nThe answer has to do with how Earth moves. Our planet travels around the sun once every year. But Earth is not straight up and down. It leans a little, like someone tilting their head.\n\nThis lean is called a tilt. Because of this tilt, different parts of Earth get more or less sunlight during the year.\n\nWhen the northern half (where we live) leans toward the sun, we get longer days and warmer weather. That's summer. Six months later, the same half leans away from the sun. Days become shorter and colder. That's winter.\n\nSpring and autumn happen in between, when the lean is sideways. Then both halves get about the same amount of sunlight.\n\nSo seasons are not magic. They are simply the result of our planet's gentle tilt as it travels around the sun.` },
+            { id:5, title:"The Great Barrier Reef", subtitle:"大堡礁", img:"images/lesson6.jpg", poster:"images/poster6.jpg",
+              body:`In the warm waters of Australia, there is a very special place called the Great Barrier Reef. It is the largest coral reef system in the world. In fact, you can even see it from space!\n\nThe reef is made up of billions of tiny animals called coral polyps. These polyps build hard skeletons around themselves. Over thousands of years, these skeletons pile up to form huge underwater mountains.\n\nThousands of kinds of fish, turtles, and other sea creatures call the reef home. Bright clownfish hide among the coral. Sea turtles swim slowly past. Even sharks visit from time to time.\n\nSadly, the reef is in danger. Warmer ocean water can harm the coral. When the water gets too hot, the coral turns white. This is called bleaching. Scientists are working hard to protect this amazing place.\n\nMany people believe that saving the reef is important – not just for the animals, but for the whole planet. After all, healthy oceans mean a healthy Earth.` },
+            { id:6, title:"The Life of Ada Lovelace", subtitle:"阿达·洛芙莱斯的一生", img:"images/lesson7.jpg",
+              body:`Ada Lovelace was born in 1815 to a famous poet and a mathematical mother. Her childhood was unusual for the era. Instead of poetry, she studied mathematics and science. Her mother insisted on a rigorous education. This prepared her for a remarkable career.\n\nAt the age of seventeen, she met Charles Babbage, a brilliant inventor. He had designed the Analytical Engine, a mechanical computer. Ada was fascinated by his work. She began to translate an article about the machine. However, she added her own notes, which were three times longer than the original. These notes contained what is now considered the first computer program.\n\nDespite her genius, Ada faced many obstacles. Women were rarely encouraged to pursue science. Nevertheless, she continued her work. She married and had children, but she never stopped her studies. Her health was poor, and she died at the age of thirty-six.\n\nToday, Ada is remembered as a pioneer. A programming language is named after her. Her story inspires countless people. Although she lived in the nineteenth century, her legacy endures. Indeed, her vision shaped the digital age. Without her, the history of computing might be very different.` }
+        ];
+
+        /* 词典：word|中文意思|词性|词根说明|前后缀说明 */
+        const dictRaw = `
+sunny|晴朗的|adj.|sun 太阳|-y 形容词后缀（充满…的）
+afternoon|下午|n.|after 在…之后 + noon 中午|合成词
+park|公园|n.|parc 围场|无
+kite|风筝|n.|kite 鸢|无
+tail|尾巴|n.|tægl 尾部|无
+wind|风|n.|wind 缠绕流动|无
+tight|紧的；紧紧地|adj./adv.|tight 拉紧|无
+string|细绳|n.|string 拉紧的线|无
+slipped|滑落（过去式）|v.|slip 滑动|-ed 过去式
+disappeared|消失（过去式）|v.|appear 出现|dis- 否定前缀 + -ed 过去式
+bench|长椅|n.|benc 板凳|无
+pond|池塘|n.|pond 围起来的水|无
+bushes|灌木丛|n.|bush 灌木|-es 复数后缀
+knot|（绳）结|n.|cnotta 结|无
+safe|安全的|adj.|salvus 完好|无
+difference|差异；差别|n.|differ 不同|-ence 名词后缀
+learned|学到（过去式）|v.|learn 学习|-ed 过去式
+important|重要的|adj.|import 要义|-ant 形容词后缀
+simple|简单的|adj.|sim 单一 + ple 折叠|无
+desk|书桌|n.|discus 圆盘|无
+math|数学|n.|mathema 学问|缩写自 mathematics
+heavy|沉重的|adj.|hefig 重|-y 形容词后缀
+studied|学习（过去式）|v.|study 学习|-ed 过去式
+ready|准备好的|adj.|ræde 准备|-y 形容词后缀
+rest|休息|n./v.|raste 歇息|无
+brain|大脑|n.|brægen 脑|无
+worried|担心的|adj.|worry 担忧|-ed 形容词/过去式
+forget|忘记|v.|for 离开 + get 抓住|for- 前缀（离弃）
+gently|温柔地|adv.|gentle 温和的|-ly 副词后缀
+breath|呼吸|n.|bræth 气息|无
+solved|解决（过去式）|v.|solve 解开|-ed 过去式
+formulas|公式|n.|formula 形式|-s 复数后缀
+step|步骤|n.|stæpe 踏步|无
+calm|平静的|adj.|cauma 炎热后的宁静|无
+truly|真正地|adv.|true 真实的|-ly 副词后缀
+tiny|极小的|adj.|tine 细小|-y 形容词后缀
+seed|种子|n.|sæd 播种|无
+ground|地面|n.|grund 底|无
+dark|黑暗的|adj.|deorc 暗|无
+cold|寒冷的|adj.|cald 冷|无
+whispered|低语（过去式）|v.|whisper 耳语|-ed 过去式
+soil|土壤|n.|solum 土地|无
+root|根|n.|rot 根|无
+shoot|嫩芽；伸出|n./v.|sceot 射出|无
+rain|雨|n.|regn 雨|无
+warmed|使温暖（过去式）|v.|warm 温暖|-ed 过去式
+leaves|叶子|n.|leaf 叶|-ves 复数后缀
+butterflies|蝴蝶|n.|butter + fly|合成词 + -es 复数
+flowers|花|n.|flower 花|-s 复数后缀
+tall|高的|adj.|getel 迅速生长的|无
+sunflower|向日葵|n.|sun 太阳 + flower 花|合成词
+nodded|点头（过去式）|v.|nod 点头|-ed 过去式
+journey|旅程|n.|diurnum 一天的行程|-ney 名词后缀
+single|单一的|adj.|singulus 单个|无
+honey|蜂蜜|n.|hunig 蜜|无
+jars|罐子|n.|jar 罐|-s 复数后缀
+bees|蜜蜂|n.|bee 蜂|-s 复数后缀
+worker|工人；工蜂|n.|work 工作|-er 名词后缀（…的人/物）
+tongues|舌头|n.|tongue 舌|-s 复数后缀
+sweet|甜的|adj.|swete 甜|无
+juice|汁液|n.|jus 汁|无
+nectar|花蜜|n.|nektar 神酒|无
+hive|蜂巢|n.|hȳf 蜂箱|无
+chews|咀嚼|v.|chew 嚼|-s 第三人称单数
+chemicals|化学物质|n.|chemic 化学的|-al 形容词后缀 + -s 复数
+wax|蜡|n.|weax 蜡|无
+cells|蜂室；细胞|n.|cell 小室|-s 复数后缀
+fan|扇风|v.|fann 扬谷器|无
+wings|翅膀|n.|wing 翼|-s 复数后缀
+fresh|新鲜的|adj.|fersc 新鲜|无
+teaspoon|茶匙|n.|tea 茶 + spoon 匙|合成词
+spoonful|一勺的量|n.|spoon 匙|-ful 后缀（充满…的量）
+trips|行程；旅程|n.|trip 旅程|-s 复数后缀
+wondered|想知道（过去式）|v.|wonder 惊奇|-ed 过去式
+store|储存|v.|instaurare 备办|无
+stomach|胃|n.|stomachos 胃|无
+returns|返回|v.|return 回|-s 第三人称单数
+passes|传递|v.|pass 经过|-es 第三人称单数
+cover|覆盖|v.|cooperire 遮盖|无
+result|结果|n.|re 回 + sult 跳|re- 前缀（回）
+winter|冬天|n.|wintr 湿季|无
+summer|夏天|n.|sumor 夏|无
+earth|地球|n.|erthe 土地|无
+planet|行星|n.|planetes 漫游者|无
+travels|运行；旅行|v.|travel 旅行|-s 第三人称单数
+leans|倾斜|v.|lean 倾|-s 第三人称单数
+tilting|倾斜（现在分词）|v.|tilt 倾|-ing 现在分词
+tilt|倾斜|n./v.|tilt 倾倒|无
+sunlight|阳光|n.|sun 太阳 + light 光|合成词
+northern|北方的|adj.|north 北|-ern 形容词后缀
+autumn|秋天|n.|autumnus 秋|无
+sideways|侧向地|adv.|side 边 + way 方向|合成词 + -s
+magic|魔法|n.|mageia 法术|无
+gentle|温和的|adj.|gentilis 同族的|无
+answer|答案|n.|andswaru 回应|无
+straight|笔直的|adj.|streccan 伸展|无
+amount|数量|n.|a 向 + mount 山|无
+simply|仅仅；简单地|adv.|simple 简单|-ly 副词后缀
+waters|水域|n.|water 水|-s 复数后缀
+australia|澳大利亚|n.|australis 南方的|专有名词
+coral|珊瑚|n.|korallion 珊瑚|无
+reef|礁|n.|rif 礁脉|无
+space|太空；空间|n.|spatium 空地|无
+billions|数十亿|n.|billion 十亿|-s 复数后缀
+polyps|珊瑚虫|n.|polypous 多足的|-s 复数后缀
+skeletons|骨骼|n.|skeleton 骨架|-s 复数后缀
+underwater|水下的|adj.|under 在下 + water 水|under- 前缀（在…下）
+mountains|山脉|n.|mountain 山|-s 复数后缀
+creatures|生物|n.|creare 创造|-ure 名词后缀 + -s 复数
+clownfish|小丑鱼|n.|clown 小丑 + fish 鱼|合成词
+turtles|海龟|n.|turtle 龟|-s 复数后缀
+sharks|鲨鱼|n.|shark 鲨|-s 复数后缀
+danger|危险|n.|dominarium 支配权|无
+harm|伤害|n./v.|hearm 伤害|无
+bleaching|白化|n.|bleach 漂白|-ing 名词后缀
+protect|保护|v.|pro 向前 + tegere 遮盖|pro- 前缀（向前）
+healthy|健康的|adj.|health 健康|-y 形容词后缀
+ocean|海洋|n.|okeanos 大洋|无
+scientists|科学家|n.|science 科学 + -ist 人|-ist 名词后缀（…的人）+ -s
+amazing|惊人的|adj.|amaze 使惊愕|-ing 形容词后缀
+believe|相信|v.|be 使 + lief  dear|无
+saving|拯救|n./v.|save 救|-ing 后缀
+whole|整个的|adj.|hāl 完整|无
+poet|诗人|n.|poiein 创作|无
+mathematical|数学的|adj.|mathema 学问|-al 形容词后缀
+childhood|童年|n.|child 孩子|-hood 名词后缀（时期/状态）
+unusual|不寻常的|adj.|usual 寻常的|un- 否定前缀
+era|时代|n.|aera 纪元|无
+poetry|诗歌|n.|poet 诗人|-ry 名词后缀（集合/技艺）
+mathematics|数学|n.|mathema 学问|-ics 名词后缀（学科）
+science|科学|n.|scire 知道|-ence 名词后缀
+insisted|坚持（过去式）|v.|sistere 站立|in- 前缀（进入）+ -ed 过去式
+rigorous|严格的|adj.|rigor 僵硬|-ous 形容词后缀
+education|教育|n.|ducere 引导|e- 前缀（出）+ -ation 名词后缀
+remarkable|非凡的|adj.|mark 标记|re- 前缀（再）+ -able 形容词后缀（可…的）
+career|事业；生涯|n.|carrus 车行道|无
+inventor|发明家|n.|invenire 发现|-or 名词后缀（…的人）
+designed|设计（过去式）|v.|signare 标记|de- 前缀（下）+ -ed 过去式
+engine|引擎；机器|n.|ingenium 天赋|无
+mechanical|机械的|adj.|mechane 器械|-al 形容词后缀
+fascinated|着迷的|adj.|fascinare 施魔法|-ate 动词后缀 + -ed
+translate|翻译|v.|latus 搬运|trans- 前缀（横过/转变）
+article|文章|n.|artus 关节（段落）|无
+original|原始的；原作|adj./n.|oriri 升起|-al 形容词后缀
+program|程序|n.|graphein 写|pro- 前缀（向前）
+genius|天才|n.|gignere 生育|无
+obstacles|障碍|n.|stare 站立|ob- 前缀（对抗）+ -acle 名词后缀 + -s
+encouraged|鼓励（过去式）|v.|cor 心|en- 前缀（使）+ -ed 过去式
+pursue|追求|v.|sequi 跟随|pur- 前缀（向前）
+nevertheless|然而|adv.|never + the + less|合成词
+married|已婚的|adj.|marier 结婚|-ed 形容词后缀
+studies|研究；学业|n.|studium 热忱|-ies 复数后缀
+poor|差的；贫穷的|adj.|pauper 贫|无
+died|死亡（过去式）|v.|die 死|-ed 过去式
+pioneer|先驱|n.|pes 脚（步兵）|无
+language|语言|n.|lingua 舌|-age 名词后缀
+inspires|激励|v.|spirare 呼吸|in- 前缀（注入）+ -s
+countless|无数的|adj.|count 计数|-less 后缀（无…的）
+legacy|遗产|n.|legare 遗留|-cy 名词后缀
+endures|持续|v.|durus 坚硬|en- 前缀（使）+ -s
+vision|愿景；视力|n.|videre 看|-ion 名词后缀
+shaped|塑造（过去式）|v.|shape 形状|-ed 过去式
+digital|数字的|adj.|digitus 手指|-al 形容词后缀
+computing|计算|n.|computare 计算|-ing 名词后缀
+history|历史|n.|histor 知晓的|-y 名词后缀
+famous|著名的|adj.|fama 名声|-ous 形容词后缀
+brilliant|才华横溢的|adj.|beryl 宝石|-ant 形容词后缀
+added|添加（过去式）|v.|add 加|-ed 过去式
+contained|包含（过去式）|v.|tenere 持有|con- 前缀（共同）+ -ed 过去式
+considered|被认为|adj./v.|consider 考虑|-ed 过去式
+seventeen|十七|num.|seven + teen|合成词
+`;
+        const dict = {};
+        dictRaw.trim().split('\n').forEach(line => {
+            const p = line.split('|');
+            if (p.length >= 5) dict[p[0].trim()] = { cn: p[1].trim(), pos: p[2].trim(), root: p[3].trim(), affix: p[4].trim() };
+        });
+
+        const PREFIXES = [
+            ['un','不/相反'],['re','再/回'],['dis','不/除去'],['pre','预先'],['mis','错误'],
+            ['non','非/不'],['over','过度'],['under','在下/不足'],['sub','下/次'],['inter','互相/之间'],
+            ['trans','横过/转变'],['super','超'],['anti','反对'],['auto','自己'],['bi','二'],['co','共同'],
+            ['de','去掉/向下'],['en','使/进入'],['ex','外/前'],['fore','前/预先'],['mid','中'],['post','后'],
+            ['pro','向前'],['semi','半'],['tri','三'],['multi','多'],['micro','微'],['tele','远'],
+            ['im','不/进入'],['in','不/向内'],['ob','对抗'],['per','贯穿'],['com','共同'],['con','共同'],['ab','离开']
+        ];
+        const SUFFIXES = [
+            ['tion','名词后缀（表动作/结果）','n.'],['sion','名词后缀','n.'],['ment','名词后缀','n.'],
+            ['ness','名词后缀（表性质）','n.'],['ity','名词后缀（表性质）','n.'],['ance','名词后缀','n.'],
+            ['ence','名词后缀','n.'],['ship','名词后缀（表身份）','n.'],['hood','名词后缀（表时期）','n.'],
+            ['ism','名词后缀（表主义）','n.'],['ist','名词后缀（…的人）','n.'],['er','名词后缀（…的人/物）','n.'],
+            ['or','名词后缀（…的人/物）','n.'],['age','名词后缀','n.'],['ure','名词后缀','n.'],['ics','名词后缀（学科）','n.'],
+            ['ful','形容词后缀（充满…的）','adj.'],['ous','形容词后缀','adj.'],['ive','形容词后缀','adj.'],
+            ['able','形容词后缀（可…的）','adj.'],['ible','形容词后缀（可…的）','adj.'],['al','形容词后缀','adj.'],
+            ['ic','形容词后缀','adj.'],['ish','形容词后缀','adj.'],['less','形容词后缀（无…的）','adj.'],
+            ['ant','形容词/名词后缀','adj.'],['ent','形容词/名词后缀','adj.'],['ary','形容词后缀','adj.'],
+            ['ly','副词后缀','adv.'],['ize','动词后缀','v.'],['ise','动词后缀','v.'],['ate','动词后缀','v.'],
+            ['ify','动词后缀','v.'],['en','动词后缀','v.'],['ing','现在分词/名词后缀','v.'],['ed','过去式后缀','v.'],
+            ['es','复数/第三人称后缀','n.'],['s','复数/第三人称后缀','n.'],['y','形容词/名词后缀','adj.']
+        ];
+
+        function analyzeWord(raw) {
+            const w = raw.trim();
+            const lower = w.toLowerCase().replace(/[^a-z]/g, '');
+            const short = lower.length < 4;
+            if (dict[lower]) {
+                const d = dict[lower];
+                return { cn: d.cn, pos: d.pos, stem: d.root, affix: d.affix, known: true, short };
+            }
+            let prefix = null, suffix = null, pos = 'n.', stem = lower;
+            for (const [p, m] of PREFIXES) {
+                if (lower.length > p.length + 2 && lower.startsWith(p)) { prefix = { p, m }; stem = lower.slice(p.length); break; }
+            }
+            for (const [s, m, sp] of SUFFIXES) {
+                if (stem.length > s.length + 1 && stem.endsWith(s)) { suffix = { s, m }; pos = sp; stem = stem.slice(0, stem.length - s.length); break; }
+            }
+            const parts = [];
+            if (prefix) parts.push(`前缀 <b>${prefix.p}-</b>（${prefix.m}）`);
+            parts.push(`词根 <b>${stem || '—'}</b>`);
+            if (suffix) parts.push(`后缀 <b>-${suffix.s}</b>（${suffix.m}）`);
+            return { cn: '暂未收录，可自行补充', pos, stem, prefix, suffix,
+                     affix: parts.join(' ＋ '), known: false, short };
+        }
+
+        function isParseable(text) {
+            return text.trim().toLowerCase().replace(/[^a-z]/g, '').length >= 4;
+        }
+
+        /* ===== 幼儿级英英释义（最简单英文，可用句子或单词）+ 近义词 ===== */
+        const KIDS = {
+            kite:{def:'a toy you fly in the sky on a string',syn:['toy']},
+            park:{def:'a big green place where you play',syn:['garden','playground']},
+            sunny:{def:'the sun is out and it is bright',syn:['bright']},
+            wind:{def:'air that moves past you',syn:['breeze','air']},
+            string:{def:'a long thin thing you use to tie',syn:['rope','thread']},
+            garden:{def:'a place with flowers and plants',syn:['park','yard']},
+            lost:{def:'you cannot find it',syn:['missing','gone']},
+            help:{def:'you do something for someone',syn:['aid','care']},
+            learn:{def:'you get to know something new',syn:['study']},
+            smile:{def:'your mouth goes up when you are happy',syn:['grin']},
+            kind:{def:'you care about other people',syn:['nice','caring']},
+            study:{def:'you read and learn for school',syn:['learn','read']},
+            test:{def:'a school paper that checks what you know',syn:['exam','quiz']},
+            night:{def:'the dark time when you sleep',syn:['dark']},
+            morning:{def:'the early part of the day',syn:['dawn']},
+            sleep:{def:'you close your eyes and rest',syn:['rest','nap']},
+            mother:{def:'the woman who takes care of you',syn:['mom','mum']},
+            milk:{def:'a white drink you can have',syn:['drink']},
+            classroom:{def:'the room where you have class',syn:['room']},
+            teacher:{def:'the person who helps you learn',syn:['educator']},
+            student:{def:'a person who goes to school',syn:['pupil','learner']},
+            seed:{def:'a tiny thing that grows into a plant',syn:['grain']},
+            soil:{def:'the brown earth where plants grow',syn:['earth','dirt']},
+            rain:{def:'water that falls from the sky',syn:['shower']},
+            sun:{def:'the big bright thing in the sky',syn:['star']},
+            grow:{def:'you get bigger over time',syn:['rise','develop']},
+            root:{def:'the part of a plant under the ground',syn:['base']},
+            shoot:{def:'a new small green part of a plant',syn:['bud','sprout']},
+            leaf:{def:'the flat green part of a plant',syn:['green']},
+            flower:{def:'the pretty part of a plant',syn:['bloom','blossom']},
+            plant:{def:'a green living thing that grows',syn:['tree','flower']},
+            tree:{def:'a big tall plant',syn:['plant']},
+            bird:{def:'an animal with wings that can fly',syn:['animal']},
+            bee:{def:'a small insect that makes honey',syn:['insect']},
+            honey:{def:'sweet food made by bees',syn:['syrup']},
+            nectar:{def:'the sweet juice inside flowers',syn:['juice','syrup']},
+            hive:{def:'the house where bees live',syn:['home','house']},
+            insect:{def:'a very small animal with six legs',syn:['bug']},
+            season:{def:'one of the four times of the year',syn:['time']},
+            winter:{def:'the cold time of the year',syn:['cold']},
+            summer:{def:'the hot time of the year',syn:['heat']},
+            spring:{def:'the time when flowers come out',syn:['bloom']},
+            autumn:{def:'the time when leaves fall',syn:['fall']},
+            earth:{def:'the big planet we live on',syn:['world','ground']},
+            snow:{def:'soft white cold bits from the sky',syn:['ice']},
+            warm:{def:'a little hot, but not too hot',syn:['hot']},
+            cold:{def:'not warm at all',syn:['cool','chilly']},
+            reef:{def:'a long hard wall under the sea',syn:['rock']},
+            coral:{def:'a hard colourful thing in the sea',syn:['reef']},
+            ocean:{def:'the very big sea',syn:['sea','water']},
+            fish:{def:'an animal that lives in water',syn:['animal']},
+            turtle:{def:'a slow animal with a hard shell',syn:['animal']},
+            island:{def:'land with water all around it',syn:['land']},
+            water:{def:'the clear liquid you drink',syn:['drink','liquid']},
+            computer:{def:'a machine that helps you work and play',syn:['machine']},
+            machine:{def:'a thing with parts that does work',syn:['tool','device']},
+            number:{def:'how many of something',syn:['count']},
+            science:{def:'learning about the world around us',syn:['study']},
+            famous:{def:'many people know your name',syn:['known']},
+            history:{def:'things that happened long ago',syn:['past']},
+            happy:{def:'you feel good inside',syn:['glad','joyful']},
+            sad:{def:'you do not feel good',syn:['unhappy']},
+            beautiful:{def:'very nice to look at',syn:['pretty','lovely']},
+            big:{def:'not small at all',syn:['large','huge']},
+            small:{def:'not big at all',syn:['little','tiny']},
+            important:{def:'you really need to think about it',syn:['key','big']},
+            simple:{def:'easy to do or to understand',syn:['easy']},
+            safe:{def:'nothing can hurt you',syn:['ok','fine']},
+            fast:{def:'you move very quickly',syn:['quick']},
+            slow:{def:'you move with little speed',syn:[]},
+            give:{def:'you hand something to someone',syn:['hand','pass']},
+            take:{def:'you get something in your hand',syn:['get','hold']},
+            find:{def:'you see something you were looking for',syn:['get','see']},
+            fly:{def:'you move through the air',syn:['soar']},
+            high:{def:'far up from the ground',syn:['tall']},
+            soft:{def:'it feels nice when you touch it',syn:['smooth']},
+            hard:{def:'it does not bend when you touch it',syn:['solid','firm']},
+            sky:{def:'the big blue space above us',syn:['air']},
+            friend:{def:'someone you like to play with',syn:['pal']},
+            home:{def:'the place where you live',syn:['house']},
+            book:{def:'a thing you read',syn:['story']},
+            read:{def:'you look at words and understand them',syn:['study']},
+            write:{def:'you put words on paper',syn:['print']},
+            play:{def:'you have fun',syn:['fun']},
+            work:{def:'you do a job',syn:['job']},
+            day:{def:'the time when the sun is up',syn:['time']},
+            year:{def:'twelve months together',syn:['time']},
+            people:{def:'more than one person',syn:['folks']},
+            child:{def:'a young person',syn:['kid']},
+            name:{def:'what people call you',syn:['word']}
+        };
+
+        function kidDef(w, a) {
+            const k = KIDS[w];
+            if (k) return k.def;
+            const pos = ((a && a.pos) || '').replace('.', '') || 'word';
+            return 'We are still learning this word. It is a ' + pos + ' word.';
+        }
+        function kidSyn(w) {
+            const k = KIDS[w];
+            if (k && k.syn && k.syn.length) return k.syn;
+            if (typeof W_SYN !== 'undefined' && W_SYN[w] && W_SYN[w].length) return W_SYN[w];
+            return null;
+        }
+        function synHtml(arr) {
+            if (!arr) return '<span style="font-size:12px;color:var(--muted)">—</span>';
+            return arr.map(x => '<b>' + esc(x) + '</b>').join('');
+        }
+
+        /* 反义词表（同样用最简单的词） */
+        const ANTS = {
+            sunny:['cloudy','dark'], wind:['calm'], lost:['found'], help:['hinder'],
+            learn:['forget','teach'], night:['day','morning'], morning:['night','evening'],
+            sleep:['wake'], mother:['father'], teacher:['student','pupil'], student:['teacher'],
+            grow:['shrink'], winter:['summer'], summer:['winter'], spring:['autumn'], autumn:['spring'],
+            earth:['sky'], warm:['cold','cool'], cold:['hot','warm'], ocean:['land'],
+            famous:['unknown'], history:['future'], happy:['sad','unhappy'], sad:['happy','glad'],
+            beautiful:['ugly'], big:['small','little'], small:['big','large'], simple:['hard'],
+            safe:['unsafe'], fast:['slow'], slow:['fast','quick'], give:['take'], take:['give'],
+            find:['lose'], high:['low'], soft:['hard'], hard:['soft'], sky:['ground','earth'],
+            friend:['enemy'], read:['write'], write:['read'], play:['work'], work:['play','rest'],
+            day:['night'], child:['adult'], kind:['unkind','mean'], smile:['frown','cry']
+        };
+        function kidAnt(w) {
+            if (ANTS[w] && ANTS[w].length) return ANTS[w];
+            if (typeof W_ANT !== 'undefined' && W_ANT[w] && W_ANT[w].length) return W_ANT[w];
+            return null;
+        }
+        function antHtml(arr) {
+            if (!arr) return '<span style="font-size:12px;color:var(--muted)">—</span>';
+            return arr.map(x => '<i>' + esc(x) + '</i>').join('');
+        }
+
+        /* 近义词 / 反义词的例句（最简单英文句子，幼儿园能懂） */
+        const SENT = {
+            toy:'I play with my toy.', garden:'We walk in the garden.', playground:'Kids run on the playground.',
+            bright:'The sun is very bright.', breeze:'A cool breeze feels nice.', air:'We need air to live.',
+            rope:'Tie the box with a rope.', thread:'Mum sews with thread.', yard:'The dog is in the yard.',
+            missing:'One sock is missing.', gone:'The bird is gone.', aid:'We give aid to a friend.',
+            care:'I care about you.', study:'I study English every day.', grin:'He has a big grin.',
+            nice:'She is very nice.', caring:'He is a caring boy.', learn:'I learn new words every day.',
+            read:'I read a short book.', exam:'We have an exam today.', quiz:'The quiz is easy.',
+            dark:'The room is dark.', dawn:'Birds sing at dawn.', rest:'I need to rest now.',
+            nap:'The baby takes a nap.', mom:'My mom is very kind.', mum:'My mum makes a cake.',
+            drink:'I drink water every day.', room:'This room is very big.', educator:'She is a good educator.',
+            pupil:'Every pupil has a book.', learner:'He is a fast learner.', grain:'A grain of rice is small.',
+            earth:'Plants grow in the earth.', dirt:'There is dirt on my shoe.', shower:'We had a rain shower.',
+            star:'I see a star in the sky.', rise:'The sun will rise soon.', base:'The base is under the box.',
+            bud:'A bud will become a flower.', sprout:'The seed will sprout.', green:'The leaf is green.',
+            bloom:'Flowers bloom in spring.', blossom:'The tree is in blossom.', tree:'A bird lives in the tree.',
+            flower:'This flower is pretty.', animal:'A cat is a small animal.', insect:'A bee is an insect.',
+            syrup:'I like syrup on my bread.', juice:'I drink apple juice.', home:'I go home after school.',
+            house:'We live in a big house.', bug:'A bug is on the leaf.', time:'We have time to play.',
+            cold:'The snow is very cold.', heat:'I feel the heat of the sun.', fall:'Leaves fall in autumn.',
+            world:'The world is very big.', ground:'The ball is on the ground.', ice:'Ice is cold and hard.',
+            hot:'The soup is very hot.', rock:'A rock is hard and heavy.', reef:'Fish swim near the reef.',
+            sea:'The sea is very blue.', water:'I drink water every day.', machine:'This machine makes paper.',
+            tool:'A hammer is a useful tool.', device:'This device plays music.', count:'Let us count to ten.',
+            known:'He is known by many people.', past:'We learn about the past.', glad:'I am glad to see you.',
+            joyful:'It is a joyful day.', unhappy:'She looks unhappy today.', pretty:'The flower is pretty.',
+            lovely:'What a lovely day!', large:'A large dog is over there.', huge:'The elephant is huge.',
+            little:'A little cat is here.', tiny:'The ant is very tiny.', key:'This is a key point.',
+            easy:'This task is easy.', ok:'I am ok, thank you.', fine:'I feel fine today.',
+            quick:'He is quick to help.', hand:'I can hand it to you.', pass:'Please pass me the book.',
+            get:'I get a new pen.', hold:'I hold the kite string.', see:'I see a bird in the sky.',
+            soar:'Birds soar up high.', tall:'That tree is very tall.', smooth:'The table is smooth.',
+            solid:'The wall is solid.', firm:'Hold it with a firm hand.', pal:'He is my good pal.',
+            story:'I read a short story.', print:'I print my name.', fun:'We have fun at school.',
+            job:'Mum has a new job.', folks:'The folks are very kind.', kid:'That kid is my friend.',
+            word:'This word is new to me.', teach:'I teach my little sister.', shrink:'My shirt will shrink.',
+            summer:'Summer is very hot.', winter:'Winter is very cold.', autumn:'Autumn leaves are red.',
+            spring:'Spring flowers are out.', sky:'The sky is blue.', land:'We live on the land.',
+            unknown:'The answer is unknown.', future:'I dream about the future.', small:'The box is small.',
+            big:'The box is very big.', unsafe:'That road is unsafe.', slow:'The turtle is slow.',
+            lose:'Do not lose your pen.', low:'The chair is very low.', soft:'The pillow is soft.',
+            hard:'The stone is very hard.', enemy:'A fox can be an enemy.', write:'I write my name.',
+            adult:'My dad is an adult.', unkind:'Do not be unkind.', mean:'Do not be mean to others.',
+            frown:'He has a frown today.', cry:'Babies cry when they are sad.', forget:'I forget his name.',
+            wake:'I wake up at seven.', father:'My father is very tall.', student:'I am a student.',
+            teacher:'My teacher is very kind.', day:'Today is a sunny day.', morning:'I run in the morning.',
+            evening:'We eat in the evening.', found:'I found my lost pen.', hinder:'Rain can hinder our play.',
+            cloudy:'It is cloudy today.', calm:'The sea is calm.', ugly:'The old wall is ugly.',
+            fast:'He can run very fast.', safe:'We are safe at home.', sad:'I feel sad today.',
+            happy:'I am happy today.', beautiful:'The garden is beautiful.', friend:'She is my best friend.',
+            child:'The child is playing.', give:'I give her a gift.', take:'I take my bag to school.',
+            find:'I find my book.', high:'The kite is high.', simple:'This is a simple word.',
+            famous:'He is a famous writer.', history:'We study history at school.', help:'I help my friend.',
+            kind:'She is a kind girl.', smile:'I smile at my friend.', night:'I sleep at night.',
+            sleep:'I sleep in my bed.', grow:'Plants grow in spring.', rain:'Rain helps the plants.',
+            sun:'The sun is warm.', warm:'The milk is warm.', bee:'A bee makes honey.',
+            honey:'Honey is sweet.', bird:'A bird can fly.', kite:'My kite is in the sky.',
+            park:'We play in the park.', seed:'I plant a seed.', soil:'Seeds grow in the soil.',
+            leaf:'The leaf is green.', ocean:'The ocean is very big.', fish:'A fish can swim.',
+            computer:'I use a computer.', science:'Science is fun.', number:'Say the number.',
+            island:'We live on an island.', coral:'Coral is very colourful.', turtle:'A turtle is slow.',
+            wind:'The wind is cool.', string:'Hold the string.', lost:'My kite is lost.',
+            plant:'I water the plant.', shoot:'A new shoot comes up.', root:'The root is in the soil.',
+            hive:'Bees live in a hive.', nectar:'Bees take nectar.', season:'Winter is a season.',
+            snow:'Snow is white.', classroom:'Our classroom is big.', milk:'I drink milk.',
+            mother:'My mother is kind.'
+        };
+
+        function exListHtml(arr, kind) {
+            if (!arr || !arr.length) return '<div class="ex-line">—</div>';
+            return arr.map(x => '<div class="ex-line ' + kind + '"><b>' + esc(x) + '</b>' +
+                (SENT[x] ? esc(SENT[x]) : '（例句待补充）') + '</div>').join('');
+        }
+
+        /* ===== 7 篇课文全部 ≥4 字母单词的近义词 / 反义词（第 1 批 a-b） ===== */
+        const W_SYN1 = {
+            about:['around','nearly'], above:['over','higher'], added:['put in','joined'], after:['later','following'],
+            afternoon:['midday','pm'], although:['though','even though'], amazing:['wonderful','great'],
+            among:['between','with'], amount:['number','total'], analytical:['logical','careful'],
+            animals:['creatures','living things'], another:['one more','different'], answer:['reply','solution'],
+            appear:['show up','come out'], around:['about','near'], article:['story','writing'],
+            asked:['questioned','wanted to know'], australia:['a big country'], autumn:['fall'],
+            away:['off','gone'], babbage:['a famous inventor'], barrier:['wall','block'],
+            beautiful:['pretty','lovely'], became:['turned into','grew to be'], because:['since','as'],
+            become:['turn into','grow to be'], bees:['insects','honey insects'], began:['started','opened'],
+            begins:['starts','opens'], behind:['at the back','after'], believe:['think','trust'],
+            bench:['seat','long seat'], best:['finest','top'], better:['improved','nicer'],
+            between:['among','in the middle of'], billions:['very many','a huge number'],
+            birds:['flying animals'], bleaching:['whitening','fading'], blue:['sky-coloured'],
+            body:['frame','physical self'], book:['story','pages'], born:['came into the world'],
+            both:['the two of them'], brain:['mind','head'], breath:['air you take in'],
+            bright:['shiny','clever'], brilliant:['very smart','shining'], build:['make','put up'],
+            bushes:['small trees','plants'], butterflies:['colourful flying insects']
+        };
+        const W_ANT1 = {
+            about:['exactly'], above:['below','under'], added:['removed','taken away'], after:['before'],
+            afternoon:['morning'], although:[], amazing:['ordinary','plain'], among:[], amount:[],
+            analytical:[], animals:['plants'], another:['same one'], answer:['question'],
+            appear:['disappear','vanish'], around:[], article:[], asked:['answered'], australia:[],
+            autumn:['spring'], away:['here','near'], babbage:[], barrier:['opening','way through'],
+            beautiful:['ugly'], became:[], because:[], become:[], bees:[], began:['ended','finished'],
+            begins:['ends','stops'], behind:['in front of'], believe:['doubt'], bench:[],
+            best:['worst'], better:['worse'], between:[], billions:['a few'], birds:[],
+            bleaching:[], blue:[], body:['mind'], book:[], born:['died'], both:['neither'],
+            brain:[], breath:[], bright:['dark','dull'], brilliant:['dull','slow'],
+            build:['break','destroy'], bushes:[], butterflies:[]
+        };
+
+        /* 第 2 批 c-e */
+        const W_SYN2 = {
+            call:['shout','name'], called:['named','shouted'], calm:['quiet','still'], came:['arrived','got here'],
+            career:['job life','work life'], carefully:['with care','slowly and safely'], case:['box','example'],
+            cells:['small rooms','tiny parts'], century:['one hundred years'], change:['make different','shift'],
+            charles:['a man\'s name'], chemicals:['things in a lab'], chews:['bites','grinds'],
+            childhood:['young years','early life'], children:['kids','young ones'], china:['a big country'],
+            class:['lesson','group'], closed:['shut','not open'], clownfish:['a sea fish'],
+            cold:['not warm','chilly'], colder:['more cold','less warm'], comes:['arrives','gets here'],
+            computer:['machine','device'], computing:['using a computer','calculating'],
+            considered:['thought about','seen as'], contained:['held','had inside'],
+            continued:['kept on','went on'], coral:['sea rock','reef builder'], countless:['too many','endless'],
+            cover:['put over','hide'], creatures:['animals','living things'], danced:['moved to music'],
+            danger:['risk',' trouble'], dark:['not light','black'], days:['24 hours','daytime'],
+            deep:['far down','not shallow'], designed:['planned','drew'], desk:['table','work table'],
+            didn:['did not'], died:['passed away','stopped living'], difference:['unlikeness','change'],
+            different:['not the same','unlike'], digital:['using numbers','electronic'],
+            disappeared:['vanished','went away'], doesn:['does not'], done:['finished','ended'],
+            down:['low','below'], drink:['sip','have a drink'], during:['while','in the time of'],
+            each:['every one','every'], earth:['world','ground','soil'], education:['learning','school'],
+            emma:['a girl\'s name'], encouraged:['cheered on','helped'], endures:['lasts','stays'],
+            engine:['machine','motor'], enough:['as much as needed'], even:['still','also'],
+            ever:['always','at any time'], every:['each','all'], everything:['all things'],
+            everywhere:['all over','in all places'], eyes:['organs to see']
+        };
+        const W_ANT2 = {
+            call:[], called:[], calm:['wild','noisy'], came:['went','left'], career:[],
+            carefully:['carelessly'], case:[], cells:[], century:[], change:['stay the same'],
+            charles:[], chemicals:[], chews:[], childhood:['adult life'], children:['adults','grown-ups'],
+            china:[], class:[], closed:['open'], clownfish:[], cold:['hot','warm'], colder:['hotter','warmer'],
+            comes:['goes','leaves'], computer:[], computing:[], considered:['ignored'], contained:[],
+            continued:['stopped','ended'], coral:[], countless:['few'], cover:['uncover','open'],
+            creatures:[], danced:[], danger:['safety'], dark:['bright','light'], days:['nights'],
+            deep:['shallow'], designed:[], desk:[], didn:[], died:['lived','was born'],
+            difference:['sameness'], different:['same','alike'], digital:[], disappeared:['appeared','showed up'],
+            doesn:[], done:['unfinished'], down:['up'], drink:[], during:[], each:[],
+            earth:['sky'], education:[], emma:[], encouraged:['discouraged'], endures:['ends'],
+            engine:[], enough:['not enough','too little'], even:[], ever:['never'], every:[],
+            everything:['nothing'], everywhere:['nowhere'], eyes:[]
+        };
+
+        /* 第 3 批 f-l */
+        const W_SYN3 = {
+            face:['look at','front of head'], faced:['met','looked at'], fact:['truth','reality'],
+            famous:['well-known','renowned'], fascinated:['very interested','amazed'], feel:['sense','touch'],
+            feeling:['sense','emotion'], fell:['dropped','went down'], felt:['sensed','touched'],
+            finally:['at last','in the end'], find:['discover','locate'], first:['number one','earliest'],
+            fish:['sea animal'], flew:['went by air'], flowers:['blooms','blossoms'], forget:['not remember'],
+            form:['shape','make'], formulas:['rules','maths rules'], fresh:['new','clean'],
+            from:['out of','starting at'], garden:['yard','park'], gave:['handed','passed'],
+            genius:['very smart person'], gentle:['soft','kind'], gently:['softly','kindly'],
+            gets:['receives','becomes'], give:['hand','pass'], glass:['cup material','window material'],
+            great:['very good','big'], green:['grass-coloured'], grew:['got bigger','became'],
+            ground:['earth','floor'], grown:['become','got bigger'], half:['one of two parts'],
+            halves:['two parts'], hand:['part of the arm'], happen:['take place','occur'],
+            hard:['not soft','difficult'], harm:['hurt','damage'], have:['own','hold'],
+            head:['top part','mind'], health:['wellness','being well'], healthy:['well','strong'],
+            heavy:['not light','weighty'], held:['kept','gripped'], help:['aid','assist'],
+            here:['this place'], hide:['conceal','stay out of sight'], higher:['more up','taller'],
+            history:['the past','past events'], hive:['bee house'], hold:['grip','keep'],
+            home:['house','where you live'], honey:['sweet bee food'], hours:['60 minutes each'],
+            however:['but','though'], huge:['very big','giant'], important:['key','big'],
+            indeed:['truly','really'], insisted:['kept saying','demanded'], inspires:['encourages','motivates'],
+            instead:['in place of','rather'], into:['inside','to the inside of'], inventor:['maker','creator'],
+            jars:['glass pots'], journey:['trip','travel'], juice:['liquid from fruit'],
+            just:['only','fair'], keep:['hold on to','stay'], kinds:['types','sorts'],
+            kite:['flying toy'], knew:['had knowledge of'], knot:['tied loop'], know:['understand','be aware'],
+            knowing:['understanding','aware'], landed:['came down','touched ground'], language:['words','tongue'],
+            largest:['biggest','greatest'], later:['after','soon after'], lean:['tilt','bend'],
+            leans:['tilts','bends'], learned:['studied','found out'], leaves:['green plant parts','goes away'],
+            legacy:['what is left behind'], less:['not as much','smaller amount'], life:['being alive','living'],
+            like:['love','similar to'], little:['small','tiny'], live:['be alive','dwell'],
+            lived:['was alive','dwelt'], long:['not short','lengthy'], longer:['more long'],
+            look:['see','gaze'], looked:['saw','gazed'], looking:['watching','searching'], lost:['missing','gone']
+        };
+        const W_ANT3 = {
+            face:['avoid','back of head'], faced:['avoided'], fact:['lie','story'],
+            famous:['unknown'], fascinated:['bored'], feel:[], feeling:[], fell:['rose','stood up'],
+            felt:[], finally:['at first'], find:['lose','miss'], first:['last'], fish:[],
+            flew:['walked','landed'], flowers:[], forget:['remember','recall'], form:[],
+            formulas:[], fresh:['old','stale'], from:['to'], garden:[], gave:['took','got'],
+            genius:['fool'], gentle:['rough','hard'], gently:['roughly','hard'], gets:['gives'],
+            give:['take','get'], glass:[], great:['bad','small'], green:[], grew:['shrank'],
+            ground:['sky','air'], grown:[], half:['whole'], halves:['whole'], hand:[],
+            happen:[], hard:['soft','easy'], harm:['help','protect'], have:['lack','need'],
+            head:['foot','bottom'], health:['sickness'], healthy:['sick','ill'], heavy:['light'],
+            held:['let go','dropped'], help:['hinder'], here:['there'], hide:['show','reveal'],
+            higher:['lower'], history:['future'], hive:[], hold:['drop','let go'], home:['away'],
+            honey:[], hours:[], however:[], huge:['tiny','small'], important:['unimportant'],
+            indeed:[], insisted:['gave in'], inspires:['discourages'], instead:[], into:['out of'],
+            inventor:[], jars:[], journey:[], juice:[], just:['unfair'], keep:['give away','lose'],
+            kinds:[], kite:[], knew:[], knot:['loose end'], know:['wonder'], knowing:[],
+            landed:['took off'], language:[], largest:['smallest'], later:['earlier','before'],
+            lean:['stand straight'], leans:['stands straight'], learned:['forgot'], leaves:['arrives'],
+            legacy:[], less:['more'], life:['death'], like:['hate','unlike'], little:['big','large'],
+            live:['die'], lived:['died'], long:['short'], longer:['shorter'], look:[],
+            looked:[], looking:[], lost:['found']
+        };
+
+        /* 第 4 批 m-p */
+        const W_SYN4 = {
+            machine:['device','tool'], made:['built','created'], magic:['wonder','special power'],
+            make:['build','create'], makes:['builds','creates'], many:['lots of','numerous'],
+            married:['wed','joined in marriage'], math:['numbers','arithmetic'], mathematical:['to do with numbers'],
+            mathematics:['maths','number study'], maya:['a girl\'s name'], maybe:['perhaps','possibly'],
+            mean:['signify','unkind'], mechanical:['to do with machines'], might:['may','power'],
+            milk:['white drink'], minutes:['60 seconds each'], months:['about 30 days each'],
+            more:['extra','greater amount'], morning:['early day','dawn time'], mother:['mum','female parent'],
+            mountains:['high hills'], mouth:['lips and teeth part'], moves:['goes','shifts'],
+            much:['a lot','plenty'], named:['called'], near:['close to','beside'],
+            nectar:['sweet flower juice'], need:['must have','require'], never:['not ever','at no time'],
+            nevertheless:['but','even so'], next:['following','after this'], nodded:['moved head up and down'],
+            northern:['in the north','top'], notes:['short writings','messages'], obstacles:['blocks','problems'],
+            ocean:['sea','big water'], oceans:['seas','big waters'], once:['one time','long ago'],
+            only:['just','solely'], original:['first','new'], other:['different','another'],
+            over:['above','finished'], park:['green play place'], part:['piece','section'],
+            parts:['pieces','sections'], passes:['goes by','hands over'], past:['before now','history'],
+            people:['persons','folks'], pile:['heap','stack'], pioneer:['first explorer','leader'],
+            place:['spot','put'], placed:['put','set'], planet:['world','earth-like body'],
+            plant:['green living thing','put in soil'], plants:['green living things'], poet:['writer of poems'],
+            poetry:['poems'], polyps:['tiny sea animals'], pond:['small water','pool'],
+            poor:['not rich','unlucky'], prepared:['got ready','made ready'], problems:['troubles','questions'],
+            program:['set of steps','plan'], programming:['writing computer steps'], protect:['keep safe','guard'],
+            pursue:['follow','chase'], pushed:['shoved','pressed']
+        };
+        const W_ANT4 = {
+            machine:[], made:['broke','destroyed'], magic:['ordinary'], make:['break','destroy'],
+            makes:['breaks'], many:['few'], married:['single'], math:[], mathematical:[], mathematics:[],
+            maya:[], maybe:['surely','certainly'], mean:['kind'], mechanical:[], might:[],
+            milk:[], minutes:[], months:[], more:['less','fewer'], morning:['night','evening'],
+            mother:['father'], mountains:['valleys'], mouth:[], moves:['stays','stops'],
+            much:['little'], named:[], near:['far','far from'], nectar:[], need:['have enough'],
+            never:['always'], nevertheless:[], next:['last','previous'], nodded:['shook head'],
+            northern:['southern'], notes:[], obstacles:['help','open way'], ocean:['land'], oceans:['land'],
+            once:['many times','never'], only:[], original:['copy','same'], other:['same'],
+            over:['under','below'], park:[], part:['whole'], parts:['whole'], passes:['stops','fails'],
+            past:['future','now'], people:['animals'], pile:['spread'], pioneer:['follower'],
+            place:[], placed:['removed'], planet:[], plant:['animal','dig up'], plants:['animals'],
+            poet:[], poetry:[], polyps:[], pond:[], poor:['rich','lucky'], prepared:['unprepared'],
+            problems:['answers','solutions'], program:[], programming:[], protect:['harm','attack'],
+            pursue:['avoid','run from'], pushed:['pulled']
+        };
+
+        /* 第 5 批 q-s */
+        const W_SYN5 = {
+            question:['ask','problem to answer'], rarely:['not often','seldom'], reached:['got to','arrived at'],
+            read:['look at words'], ready:['set','prepared'], reef:['sea wall','coral wall'],
+            remarkable:['amazing','special'], remembered:['recalled','kept in mind'], rest:['relax','the others'],
+            result:['answer','outcome'], returns:['comes back','gives back'], rigorous:['very careful','strict'],
+            root:['plant part under ground','base'], safe:['not in danger','protected'], said:['spoke','told'],
+            same:['alike','not different'], sang:['made music with the voice'], saving:['keeping safe','rescuing'],
+            science:['study of the world'], scientists:['science experts','researchers'], seasons:['times of the year'],
+            seed:['tiny plant starter'], seventeen:['the number 17'], shaped:['formed','made into a shape'],
+            sharks:['big sea fish'], shoot:['new plant part','sprout'], shorter:['less tall','less long'],
+            shouted:['called out','yelled'], sideways:['to the side','not straight'], simple:['easy','plain'],
+            simply:['just','only'], single:['one','only one'], sister:['female sibling'],
+            skeletons:['body bones','frames'], sleep:['rest with eyes closed'], slipped:['slid','fell out of the hand'],
+            slowly:['not fast','at a slow speed'], small:['little','tiny'], smiled:['grinned','looked happy'],
+            softly:['gently','quietly'], soil:['earth','dirt'], solved:['worked out','answered'],
+            someone:['a person','somebody'], something:['a thing'], sometimes:['at times','now and then'],
+            space:['room','outer space'], special:['different','important'], spoonful:['one spoon of'],
+            step:['move the foot','stage'], still:['not moving','yet'], stomach:['tummy','body part for food'],
+            stopped:['ended','halted'], store:['keep','shop'], story:['tale','account'],
+            straight:['not bent','direct'], string:['thin rope','thread'], studied:['learned','read about'],
+            studies:['learns','reads about'], summer:['hot season'], sunflower:['a tall yellow flower'],
+            sunlight:['light from the sun'], sunny:['bright with sun'], sweet:['sugary','kind'],
+            swim:['move in water'], system:['set of parts','method']
+        };
+        const W_ANT5 = {
+            question:['answer'], rarely:['often','always'], reached:['left','missed'], read:['write'],
+            ready:['unready','not set'], reef:[], remarkable:['ordinary','plain'], remembered:['forgot'],
+            rest:['work','move'], result:['cause','start'], returns:['leaves','goes'], rigorous:['loose','careless'],
+            root:['top','leaf'], safe:['unsafe','in danger'], said:[], same:['different'], sang:[],
+            saving:['wasting','losing'], science:[], scientists:[], seasons:[], seed:[], seventeen:[],
+            shaped:[], sharks:[], shoot:[], shorter:['taller','longer'], shouted:['whispered'],
+            sideways:['straight'], simple:['hard','difficult'], simply:[], single:['many','double'],
+            sister:['brother'], skeletons:[], sleep:['wake'], slipped:['gripped','held'], slowly:['fast','quickly'],
+            small:['big','large'], smiled:['frowned','cried'], softly:['hard','loudly'], soil:[],
+            solved:['unsolved'], someone:[], something:['nothing'], sometimes:['never','always'], space:[],
+            special:['ordinary','common'], spoonful:[], step:[], still:['moving'], stomach:[],
+            stopped:['started','kept going'], store:['use up','throw away'], story:['fact','truth'],
+            straight:['bent','curved'], string:[], studied:['ignored'], studies:[], summer:['winter'],
+            sunflower:[], sunlight:['darkness','shade'], sunny:['cloudy','dark'], sweet:['sour','bitter'],
+            swim:['sink','walk'], system:[]
+        };
+
+        /* 第 6 批 t-z */
+        const W_SYN6 = {
+            tail:['the back end part'], takes:['gets','grabs'], tall:['high','not short'],
+            teaspoon:['a small spoon'], test:['exam','check'], than:['compared with'],
+            thank:['say thanks'], that:['the one'], their:['belonging to them'], themselves:['their own selves'],
+            then:['next','at that time'], there:['that place'], these:['this group'], they:['those people'],
+            thirty:['the number 30'], this:['the one here'], thought:['idea','belief'],
+            thousands:['very many','lots of hundreds'], three:['the number 3'], through:['across','from end to end'],
+            tight:['firm','not loose'], tilt:['lean','slope'], tilting:['leaning','sloping'],
+            time:['moment','hours and days'], times:['occasions','moments'], tiny:['very small'],
+            today:['this day'], together:['as one group','with each other'], tongues:['mouth parts','languages'],
+            took:['grabbed','got'], toward:['to','in the direction of'], translate:['change into another language'],
+            travels:['goes','journeys'], trees:['big plants'], trips:['journeys','visits'],
+            truly:['really','in truth'], turning:['changing','going round'], turns:['changes','goes round'],
+            turtles:['slow sea animals'], twelfth:['number 12 in order'], under:['below','beneath'],
+            underwater:['below the water'], until:['up to the time when'], unusual:['not common','rare'],
+            upset:['sad','unhappy'], very:['really','much'], vision:['sight','a dream of the future'],
+            visit:['go to see'], visited:['went to see'], walked:['went on foot'], want:['wish for','need'],
+            warm:['a little hot'], warmed:['made warm'], warmer:['more warm'], water:['clear liquid'],
+            waters:['seas','areas of water'], weather:['rain or sun','the sky state'], week:['seven days'],
+            went:['moved','travelled'], were:['was','used to be'], what:['which thing'],
+            when:['at what time'], where:['in what place'], which:['what one'],
+            whispered:['spoke very softly'], white:['snow-coloured','pale'], whole:['all of it','complete'],
+            will:['shall','going to'], wind:['moving air'], wings:['parts used to fly'],
+            winter:['cold season'], with:['along with','using'], without:['not having','lacking'],
+            women:['ladies','female adults'], wondered:['wanted to know','asked oneself'], work:['job','task'],
+            worked:['did a job','laboured'], worker:['a person who works','bee that works'], working:['doing a job','running'],
+            works:['jobs','machines run'], world:['earth','the planet'], worried:['anxious','afraid'],
+            year:['12 months','365 days'], years:['more than one year'], your:['belonging to you'],
+            yours:['the one of you'], yourself:['you alone']
+        };
+        const W_ANT6 = {
+            tail:['head'], takes:['gives'], tall:['short'], teaspoon:[], test:[], than:[],
+            thank:['complain'], that:['this'], their:[], themselves:[], then:['now'], there:['here'],
+            these:['those'], they:[], thirty:[], this:['that'], thought:[], thousands:['a few'],
+            three:[], through:['around'], tight:['loose'], tilt:['stand straight'], tilting:['standing straight'],
+            time:[], times:[], tiny:['huge','giant'], today:['yesterday','tomorrow'], together:['alone','apart'],
+            tongues:[], took:['gave'], toward:['away from'], translate:[], travels:['stays'], trees:[],
+            trips:[], truly:['falsely'], turning:['still'], turns:[], turtles:[], twelfth:[],
+            under:['over','above'], underwater:['above water'], until:[], unusual:['usual','common'],
+            upset:['happy','calm'], very:[], vision:['blindness'], visit:[], visited:[], walked:['ran','rode'],
+            want:['have','give up'], warm:['cold','cool'], warmed:['cooled'], warmer:['colder'], water:[],
+            waters:[], weather:[], week:[], went:['came','stayed'], were:[], what:[], when:[],
+            where:[], which:[], whispered:['shouted'], white:['black','dark'], whole:['part','piece'],
+            will:[], wind:['calm'], wings:[], winter:['summer'], with:['without'], without:['with'],
+            women:['men'], wondered:['knew'], work:['play','rest'], worked:['played','rested'],
+            worker:['idler'], working:['broken','resting'], works:[], world:[], worried:['calm'],
+            year:[], years:[], your:[], yours:[], yourself:[]
+        };
+
+        /* 合并全部课文单词的近义词 / 反义词 */
+        const W_SYN = Object.assign({}, W_SYN1, W_SYN2, W_SYN3, W_SYN4, W_SYN5, W_SYN6);
+        const W_ANT = Object.assign({}, W_ANT1, W_ANT2, W_ANT3, W_ANT4, W_ANT5, W_ANT6);
+
+        /* ===== 英英释义词典（低 / 中 / 高三档 + 近反义词）===== */
+        let current = 0, mode = 'text', marks = [], annos = [], selRange = null, drag = null;
+        let circleStart = null, tempCircle = null;
+
+        let posterMode = false;
+        function togglePoster() {
+            posterMode = !posterMode;
+            document.getElementById('posterLayout').style.display = posterMode ? 'flex' : 'none';
+            document.getElementById('normalView').style.display = (posterMode || !lessons[current].img) ? 'none' : 'flex';
+            document.getElementById('normalText').style.display = posterMode ? 'none' : 'block';
+            const btn = document.getElementById('posterBtn');
+            btn.classList.toggle('active', posterMode);
+            btn.textContent = posterMode ? '📄 退出海报模式' : '🖼 海报模式';
+            if (posterMode) {
+                setMode('text');
+                document.getElementById('posterImg').src = lessons[current].poster;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                toast('海报模式：显示本课课文海报');
+            } else { toast('已返回普通模式'); }
+        }
+
+        function onPosterLoad() {
+            const old = document.querySelector('#posterLayout .poster-fallback');
+            if (old) old.remove();
+        }
+
+        function onPosterError() {
+            const pv = document.getElementById('posterLayout');
+            if (pv.querySelector('.poster-fallback')) return;
+            const d = document.createElement('div');
+            d.className = 'poster-fallback';
+            d.innerHTML = '⚠️ 海报图片加载失败，请确认 images 文件夹中的海报文件存在<br><span style="font-size:12px">' +
+                (lessons[current] ? lessons[current].poster : '') + '</span>';
+            pv.appendChild(d);
+        }
+
+        function setTheme(t) {
+            document.documentElement.setAttribute('data-theme', t);
+            localStorage.setItem('theme', t);
+            document.querySelectorAll('.theme-dot').forEach(b => b.classList.toggle('active', b.dataset.theme === t));
+        }
+
+        function lessonWords() {
+            const body = (lessons[current] && lessons[current].body) || '';
+            const arr = (body.match(/[A-Za-z]{4,}/g) || []).map(w => w.toLowerCase());
+            return Array.from(new Set(arr)).sort();
+        }
+
+        /* 全部 7 篇课文的单词（答题出题范围） */
+        function allLessonWords() {
+            const set = new Set();
+            lessons.forEach(l => {
+                const body = (l && l.body) || '';
+                (body.match(/[A-Za-z]{4,}/g) || []).forEach(w => set.add(w.toLowerCase()));
+            });
+            return Array.from(set).sort();
+        }
+
+        function renderWords() {
+            const box = document.getElementById('lessonWordList');
+            if (!box) return;
+            const list = lessonWords();
+            if (!list.length) { box.innerHTML = '<div class="empty-hint">暂无 ≥4 个字母的单词</div>'; return; }
+            box.innerHTML = list.map(w => {
+                const a = analyzeWord(w);
+                return `<div class="lw-item" onclick="showWordInfo('${w}')">
+                    <span class="lw-en">${w}</span>
+                    <span class="lw-pos">${a.pos}</span>
+                    <span class="lw-cn">${a.cn}</span>
+                    <button class="lw-add" title="加入生词表" onclick="addWordMark(event,'${w}')">＋</button>
+                </div>`;
+            }).join('');
+        }
+
+        function showWordInfo(w) {
+            const a = analyzeWord(w);
+            const affixLine = a.known ? a.affix.replace(/<\/?b>/g, '')
+                : [a.prefix ? '前缀 ' + a.prefix.p + '-（' + a.prefix.m + '）' : null,
+                   '词根 ' + (a.stem || '—'),
+                   a.suffix ? '后缀 -' + a.suffix.s + '（' + a.suffix.m + '）' : null]
+                    .filter(Boolean).join(' ＋ ');
+            const def = kidDef(w.toLowerCase(), a);
+            const syn = kidSyn(w.toLowerCase());
+            const ant = kidAnt(w.toLowerCase());
+            document.getElementById('detailBox').innerHTML = `
+                <div class="detail-word">${w}<span class="detail-pos">${a.pos}</span></div>
+                <div class="detail-row"><b>英文释义</b><span class="en-def">${esc(def)}</span></div>
+                <div class="detail-row"><b>词缀</b>${affixLine}</div>
+                <div class="detail-row"><b>近义词</b>${exListHtml(syn, 'syn')}</div>
+                <div class="detail-row"><b>反义词</b>${exListHtml(ant, 'ant')}</div>
+                <span class="detail-tag">本课词汇</span>`;
+        }
+
+        function addWordMark(e, w) {
+            e.stopPropagation();
+            if (marks.some(m => m.text.toLowerCase() === w.toLowerCase())) { toast('已在生词表中'); return; }
+            marks.push({ type: 'vocab', text: w });
+            save(); render(); showDetail(marks.length - 1);
+            toast('已加入生词表：' + w);
+        }
+
+        function addAllWords() {
+            const list = lessonWords();
+            if (!list.length) { toast('本课没有 ≥4 字母的单词'); return; }
+            const exist = new Set(marks.map(m => m.text.toLowerCase()));
+            const add = list.filter(w => !exist.has(w));
+            if (!add.length) { toast('本课词汇已全部在生词表中'); return; }
+            if (!confirm(`确定把本课的 ${add.length} 个单词全部加入生词表吗？`)) return;
+            add.forEach(w => marks.push({ type: 'vocab', text: w }));
+            save(); render();
+            toast('已加入 ' + add.length + ' 个单词');
+        }
+
+        function importLessons(input) {
+            const files = Array.from(input.files || []);
+            if (!files.length) return;
+            let loaded = 0;
+            files.forEach(f => {
+                const reader = new FileReader();
+                reader.onload = ev => {
+                    const text = (ev.target.result || '').trim();
+                    if (text) {
+                        lessons.push({
+                            id: 'u' + Date.now() + Math.floor(Math.random() * 1000),
+                            title: f.name.replace(/\.(txt|text|md)$/i, ''),
+                            subtitle: '导入课文', img: '', poster: '', body: text
+                        });
+                    }
+                    loaded++;
+                    if (loaded === files.length) {
+                        initPicker();
+                        switchLesson(lessons.length - 1);
+                        toast('已导入 ' + loaded + ' 篇课文，可在右上角切换');
+                    }
+                };
+                reader.readAsText(f, 'UTF-8');
+            });
+            input.value = '';
+        }
+
+        const bgCache = {};
+        function paintBackdrop(img) {
+            if (!img || !img.src || !img.naturalWidth) return;
+            let c = bgCache[img.src];
+            if (!c) {
+                try {
+                    const W = 32, H = 32;
+                    const cv = document.createElement('canvas');
+                    cv.width = W; cv.height = H;
+                    const ctx = cv.getContext('2d');
+                    ctx.drawImage(img, 0, 0, W, H);
+                    const d = ctx.getImageData(0, 0, W, H).data;
+                    let r = 0, g = 0, b = 0, n = 0;
+                    for (let y = 0; y < H; y++) {
+                        for (let x = 0; x < W; x++) {
+                            if (x < 3 || x > W - 4 || y < 3 || y > H - 4) {
+                                const i = (y * W + x) * 4;
+                                r += d[i]; g += d[i + 1]; b += d[i + 2]; n++;
+                            }
+                        }
+                    }
+                    r = Math.round(r / n); g = Math.round(g / n); b = Math.round(b / n);
+                    const soft = v => Math.round(v + (255 - v) * 0.4);
+                    c = { soft: [soft(r), soft(g), soft(b)], raw: [r, g, b] };
+                    bgCache[img.src] = c;
+                } catch (e) { return; }
+            }
+            const s = c.soft, rw = c.raw;
+            const c1 = 'rgb(' + s[0] + ',' + s[1] + ',' + s[2] + ')';
+            const c2 = 'rgb(' + Math.min(255, rw[0] + 26) + ',' + Math.min(255, rw[1] + 26) + ',' + Math.min(255, rw[2] + 26) + ')';
+            const style = 'linear-gradient(135deg, ' + c1 + ' 0%, ' + c2 + ' 100%)';
+            const nv = document.getElementById('normalView');
+            const pl = document.querySelector('.poster-left');
+            if (nv) nv.style.background = style;
+            if (pl) pl.style.background = style;
+        }
+
+        function resetBackdrop() {
+            const nv = document.getElementById('normalView');
+            const pl = document.querySelector('.poster-left');
+            if (nv) nv.style.background = '';
+            if (pl) pl.style.background = '';
+        }
+
+        let userRole = null, userName = '';
+        function selectRole(r) {
+            userRole = r;
+            document.querySelectorAll('.role-card').forEach(c => c.classList.toggle('active', c.dataset.role === r));
+        }
+        function refreshAccountList() {
+            const sel = document.getElementById('savedAccounts');
+            if (!sel) return;
+            const acc = getAccounts();
+            sel.innerHTML = '<option value="">— 登录以前账号（可选）—</option>' +
+                Object.keys(acc).map(n => '<option value="' + esc(n) + '">' + esc(n) + '（' +
+                    (acc[n].role === 'teacher' ? '老师' : '学生') + ' · ' + (acc[n].grade || '未填年级') +
+                    ' · ' + (acc[n].points || 0) + ' 分）</option>').join('');
+        }
+
+        function pickAccount(n) {
+            if (!n) return;
+            const acc = getAccounts();
+            document.getElementById('userName').value = n;
+            if (acc[n] && acc[n].role) selectRole(acc[n].role);
+            const gs = document.getElementById('userGrade');
+            if (gs && acc[n] && acc[n].grade) gs.value = acc[n].grade;
+            document.getElementById('userPwd').focus();
+            toast('已选择账号「' + n + '」，请输入密码登录');
+        }
+
+        function doLogin() {
+            if (!userRole) { toast('请先选择「学生版」或「老师版」'); return; }
+            const name = (document.getElementById('userName').value || '').trim();
+            const pwd = document.getElementById('userPwd').value || '';
+            const grade = document.getElementById('userGrade').value || '';
+            const gs = document.getElementById('userGrade');
+            if (gs) { gs.style.borderColor = ''; gs.style.borderWidth = ''; }
+            if (!name) { toast('请输入姓名'); document.getElementById('userName').focus(); return; }
+            if (pwd.length < 4) { toast('密码至少 4 位，请重新输入'); resetPwd(); return; }
+            if (!grade) {
+                toast('请选择年级（一年级～九年级）');
+                if (gs) { gs.style.borderColor = '#ef4444'; gs.style.borderWidth = '2px'; }
+                gs.focus();
+                return;
+            }
+            const acc = JSON.parse(localStorage.getItem('accounts') || '{}');
+            if (acc[name] && acc[name].pwd !== pwd) {
+                toast('该姓名已注册，但密码不正确，请重新输入密码');
+                resetPwd();
+                return;
+            }
+            if (!acc[name]) {
+                if (Object.keys(acc).some(k => acc[k].pwd === pwd)) {
+                    toast('该密码已被其他用户使用，请换一个密码重新输入');
+                    resetPwd();
+                    return;
+                }
+                acc[name] = { role: userRole, pwd, grade, points: 0, skins: [], bg: '', avatar: '' };
+            } else {
+                acc[name].grade = grade;
+                if (typeof acc[name].points !== 'number') acc[name].points = 0;
+                if (!Array.isArray(acc[name].skins)) acc[name].skins = [];
+            }
+            localStorage.setItem('accounts', JSON.stringify(acc));
+            userName = name;
+            userRole = acc[name].role || userRole;
+            localStorage.setItem('role', userRole);
+            localStorage.setItem('uname', userName);
+            enterApp();
+        }
+
+        function resetPwd() {
+            const el = document.getElementById('userPwd');
+            if (el) { el.value = ''; el.focus(); }
+        }
+        function enterApp() {
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('settingsPanel') && (document.getElementById('settingsPanel').style.display = 'none');
+            window.scrollTo({ top: 0, behavior: 'auto' });
+            document.getElementById('userBadge').textContent =
+                (userRole === 'student' ? '🎓 学生版' : '👩‍🏫 老师版') + ' · ' + userName;
+            document.getElementById('teacherPanel').style.display = userRole === 'teacher' ? 'block' : 'none';
+            renderTeacherStats();
+            applySkins(); renderUserModule(); renderRank(); renderMySkins();
+            toast((userRole === 'student' ? '欢迎回来，' : '老师好，') + userName);
+        }
+        function logout() {
+            localStorage.removeItem('role');
+            userRole = null;
+            userName = '';
+            document.body.style.background = '';
+            document.querySelectorAll('.role-card').forEach(c => c.classList.remove('active'));
+            document.getElementById('teacherPanel').style.display = 'none';
+            const un = document.getElementById('userName'); if (un) un.value = '';
+            const pw = document.getElementById('userPwd'); if (pw) pw.value = '';
+            const ug = document.getElementById('userGrade'); if (ug) ug.value = '';
+            const rb = document.getElementById('resumeBtn'); if (rb) rb.style.display = 'none';
+            document.getElementById('loginOverlay').style.display = 'flex';
+            refreshAccountList(); applySkins(); renderUserModule(); renderRank(); renderMySkins();
+        }
+        function renderTeacherStats() {
+            if (userRole !== 'teacher') return;
+            const box = document.getElementById('teacherStats');
+            if (!box) return;
+            let total = 0;
+            const rows = lessons.map((l, i) => {
+                const mk = JSON.parse(localStorage.getItem('m' + i) || '[]');
+                const v = mk.filter(m => m.type === 'vocab').length;
+                total += v;
+                return '<div class="ts-row"><span>' + (i + 1) + '. ' + esc(l.title) +
+                       '</span><span><b>' + v + '</b> 生词 / ' + (mk.length - v) + ' 好词句</span></div>';
+            }).join('');
+            box.innerHTML = rows + '<div class="ts-row" style="background:rgba(255,255,255,.8)"><span>全部课文合计</span><span><b>' + total + '</b> 生词</span></div>';
+        }
+        function exportAllLessons() {
+            const lines = ['英语课文生词汇总表', '导出时间：' + new Date().toLocaleString('zh-CN'), ''];
+            lessons.forEach((l, i) => {
+                const mk = JSON.parse(localStorage.getItem('m' + i) || '[]');
+                const voc = mk.filter(m => m.type === 'vocab');
+                lines.push('【' + (i + 1) + '. ' + l.title + ' ' + l.subtitle + '】生词 ' + voc.length + ' 个');
+                voc.forEach(m => {
+                    const a = analyzeWord(m.text);
+                    lines.push('  ' + m.text + '   ' + a.pos + '   ' + a.cn);
+                    lines.push('     词根词缀：' + a.affix.replace(/<\/?b>/g, ''));
+                });
+                lines.push('');
+            });
+            downloadFile('全部课文生词表.txt', lines.join('\n'));
+            toast('已导出全部课文生词表');
+        }
+        function initLogin() {
+            const saved = localStorage.getItem('role');
+            const savedName = localStorage.getItem('uname') || '';
+            const acc = JSON.parse(localStorage.getItem('accounts') || '{}');
+            if (saved && acc[savedName]) {
+                userRole = saved;
+                userName = savedName;
+                document.getElementById('userName').value = savedName;
+                selectRole(saved);
+                enterApp();
+            } else {
+                goHome();
+            }
+        }
+
+        /* ================= 账号数据 ================= */
+        function getAccounts() { return JSON.parse(localStorage.getItem('accounts') || '{}'); }
+        function setAccounts(a) {
+            localStorage.setItem('accounts', JSON.stringify(a));
+            localStorage.setItem('lastSave', new Date().toLocaleString('zh-CN'));
+            updateSaveInfo();
+        }
+        function me() { const a = getAccounts(); return userName ? (a[userName] || null) : null; }
+
+        /* ================= 皮肤定义 ================= */
+        const BG_SKINS = [
+            { id:'bg1', name:'清新薄荷', price:10,  css:'linear-gradient(135deg,#0b3b32,#1f7a63,#74cbb0)' },
+            { id:'bg2', name:'梦幻极光', price:50,  css:'linear-gradient(135deg,#4c1d95,#7c3aed,#c084fc)' },
+            { id:'bg3', name:'日落海岸', price:100, css:'linear-gradient(135deg,#7c2d12,#ea580c,#fbbf24)' }
+        ];
+        const AV_SKINS = [
+            { id:'av1', name:'小鸡',   price:10,  emoji:'🐣' },
+            { id:'av2', name:'小狐狸', price:50,  emoji:'🦊' },
+            { id:'av3', name:'独角兽', price:100, emoji:'🦄' }
+        ];
+        function allSkins() { return BG_SKINS.concat(AV_SKINS); }
+
+        function goHome() {
+            document.getElementById('loginOverlay').style.display = 'flex';
+            const rb = document.getElementById('resumeBtn');
+            if (rb) rb.style.display = userName ? 'block' : 'none';
+            refreshAccountList(); renderRank(); renderUserModule(); renderMySkins();
+        }
+        function openLogin() { goHome(); }
+        function closeHome() {
+            if (!userName) { toast('请先登录后再进入学习'); return; }
+            document.getElementById('loginOverlay').style.display = 'none';
+        }
+
+        /* ================= 设置面板：5 个滑块（1-200）实时生效 + 本地保存 ================= */
+        let ui = { fontSize:100, fontColor:100, fontOpacity:100, fontStyle:100, bgOpacity:100 };
+
+        function fontStyleOf(v) {
+            if (v <= 40) return { name:'系统默认', css:'inherit' };
+            if (v <= 80) return { name:'无衬线', css:'"Helvetica Neue", Helvetica, Arial, sans-serif' };
+            if (v <= 120) return { name:'衬线体', css:'Georgia, "Times New Roman", serif' };
+            if (v <= 160) return { name:'等宽体', css:'"Courier New", Courier, monospace' };
+            return { name:'手写体', css:'"Comic Sans MS", "Segoe Print", cursive' };
+        }
+        function onSetting() {
+            ui.fontSize = +document.getElementById('setFontSize').value;
+            ui.fontColor = +document.getElementById('setFontColor').value;
+            ui.fontOpacity = +document.getElementById('setFontOpacity').value;
+            ui.fontStyle = +document.getElementById('setFontStyle').value;
+            ui.bgOpacity = +document.getElementById('setBgOpacity').value;
+            applyUi();
+            localStorage.setItem('uiSettings', JSON.stringify(ui));
+        }
+        function applyUi() {
+            const fs = 10 + (ui.fontSize / 200) * 20;
+            const hue = Math.round((ui.fontColor / 200) * 360);
+            const color = 'hsl(' + hue + ',60%,32%)';
+            const op = 0.4 + (ui.fontOpacity / 200) * 0.6;
+            const fam = fontStyleOf(ui.fontStyle);
+            const bg = (ui.bgOpacity / 200).toFixed(2);
+            let el = document.getElementById('uiStyle');
+            if (!el) { el = document.createElement('style'); el.id = 'uiStyle'; document.head.appendChild(el); }
+            el.textContent =
+                '.stage, .body-text, .word-card, .word-en, .word-cn, .word-affix, .detail-box, .detail-word,' +
+                '.detail-row, .en-def, .lw-item, .side-panel, .module-card, .panel-title ' +
+                '{ font-size:' + fs.toFixed(1) + 'px !important; color:' + color + ' !important; }' +
+                '.stage, .body-text, .word-card, .word-cn, .detail-box, .detail-row, .en-def, .lw-item ' +
+                '{ opacity:' + op.toFixed(2) + ' !important; }' +
+                '.stage, .body-text, .word-card, .detail-box, .lw-item, .word-cn, .en-def ' +
+                '{ font-family:' + (fam.css === 'inherit' ? 'inherit' : fam.css) + ' !important; }' +
+                '.main-card, .side-panel, .module-card { background: rgba(255,255,255,' + bg + ') !important; }';
+            const setTxt = (id, t) => { const e = document.getElementById(id); if (e) e.textContent = t; };
+            setTxt('valFontSize', ui.fontSize);
+            setTxt('valFontColor', ui.fontColor);
+            setTxt('valFontOpacity', Math.round(op * 100) + '%');
+            setTxt('valFontStyle', ui.fontStyle + ' · ' + fam.name);
+            setTxt('valBgOpacity', Math.round(ui.bgOpacity / 2) + '%');
+        }
+        function loadUi() {
+            const s = JSON.parse(localStorage.getItem('uiSettings') || 'null');
+            if (s) ui = Object.assign({}, ui, s);
+            const setVal = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+            setVal('setFontSize', ui.fontSize);
+            setVal('setFontColor', ui.fontColor);
+            setVal('setFontOpacity', ui.fontOpacity);
+            setVal('setFontStyle', ui.fontStyle);
+            setVal('setBgOpacity', ui.bgOpacity);
+            applyUi();
+        }
+        function toggleSettings() {
+            const sv = document.getElementById('settingsView');
+            const sc = document.getElementById('sidebarContent');
+            const fab = document.getElementById('settingsFab');
+            const on = !sv || sv.style.display === 'none';
+            if (sv) sv.style.display = on ? 'block' : 'none';
+            if (sc) sc.style.display = on ? 'none' : 'block';
+            if (fab) fab.classList.toggle('active', on);
+        }
+
+        /* ================= 进度保存：排名 / 积分 / 皮肤 ================= */
+        function updateSaveInfo() {
+            const box = document.getElementById('saveInfo');
+            if (!box) return;
+            const t = localStorage.getItem('lastSave');
+            box.textContent = t ? ('最近保存：' + t + '（自动保存在本机）') : '进度会自动保存在本机';
+        }
+        function saveAllNow() {
+            try {
+                localStorage.setItem('accounts', JSON.stringify(getAccounts()));
+                localStorage.setItem('lastSave', new Date().toLocaleString('zh-CN'));
+                updateSaveInfo();
+            } catch (e) {}
+        }
+        function backupData() {
+            const data = { type:'english-learning-progress', savedAt:new Date().toLocaleString('zh-CN'), accounts:getAccounts(), marks:{} };
+            lessons.forEach((l, i) => {
+                const m = localStorage.getItem('m' + i), a = localStorage.getItem('a' + i);
+                if (m) data.marks['m' + i] = JSON.parse(m);
+                if (a) data.marks['a' + i] = JSON.parse(a);
+            });
+            downloadFile('学习进度_' + new Date().toISOString().slice(0, 10) + '.json',
+                JSON.stringify(data, null, 2), 'application/json');
+            saveAllNow();
+            toast('已备份：排名 / 积分 / 皮肤 / 课文标记');
+        }
+        function restoreData(input) {
+            const f = input.files && input.files[0];
+            if (!f) return;
+            const r = new FileReader();
+            r.onload = e => {
+                try {
+                    const d = JSON.parse(e.target.result);
+                    if (!d.accounts) { toast('文件格式不对，请选择备份的 JSON 文件'); return; }
+                    localStorage.setItem('accounts', JSON.stringify(d.accounts));
+                    if (d.marks) Object.keys(d.marks).forEach(k => localStorage.setItem(k, JSON.stringify(d.marks[k])));
+                    renderRank(); renderUserModule(); renderMySkins(); applySkins(); updateSaveInfo();
+                    toast('已恢复：排名 / 积分 / 皮肤');
+                } catch (err) { toast('恢复失败：文件无法解析'); }
+            };
+            r.readAsText(f, 'utf-8');
+            input.value = '';
+        }
+        window.addEventListener('beforeunload', saveAllNow);
+        setInterval(saveAllNow, 15000);
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        function applySkins() {
+            const m = me();
+            let bgCss = '', av = '🙂';
+            if (m) {
+                const bs = allSkins().find(s => s.id === m.bg);
+                if (bs) bgCss = bs.css;
+                const as = allSkins().find(s => s.id === m.avatar);
+                if (as) av = as.emoji;
+            }
+            document.body.style.background = bgCss;
+            const ea = document.getElementById('entryAvatar');
+            if (ea) ea.textContent = av;
+        }
+
+        function renderUserModule() {
+            const box = document.getElementById('modLogin');
+            const m = me();
+            const ea = document.getElementById('entryAvatar');
+            const en = document.getElementById('entryName');
+            const es = document.getElementById('entrySub');
+            const hu = document.getElementById('homeUser');
+            if (!m) {
+                if (hu) hu.textContent = '';
+                if (box) box.innerHTML = '<div class="rank-empty">尚未登录</div><button class="mod-btn" onclick="openLogin()">🔑 登录 / 注册</button>';
+                if (ea) ea.textContent = '🙂';
+                if (en) en.textContent = '未登录 · 点击登录';
+                if (es) es.textContent = '身份 · 姓名 · 密码 · 年级';
+                return;
+            }
+            const av = (allSkins().find(s => s.id === m.avatar) || {}).emoji || '🙂';
+            if (box) box.innerHTML =
+                '<div class="login-entry" style="border:1px solid var(--line);background:rgba(255,255,255,.85)">' +
+                    '<div class="avatar-big">' + av + '</div>' +
+                    '<div><div class="le-name">' + esc(userName) + '</div>' +
+                    '<div class="le-sub">' + (userRole === 'teacher' ? '老师版' : '学生版') + ' · ' + (m.grade || '未选年级') + '</div>' +
+                    '<div class="points-pill">⭐ 积分 ' + (m.points || 0) + '</div></div>' +
+                '</div>' +
+                '<button class="mod-btn ghost" onclick="logout()">🔄 切换 / 退出账号</button>';
+            if (ea) ea.textContent = av;
+            if (en) en.textContent = esc(userName);
+            if (es) es.textContent = (userRole === 'teacher' ? '老师版' : '学生版') + ' · ' + (m.grade || '') + ' · ⭐' + (m.points || 0);
+            if (hu) hu.textContent = '已登录：' + userName + ' · ⭐ 积分 ' + (m.points || 0);
+        }
+
+        function renderRank() {
+            const box = document.getElementById('rankList');
+            if (!box) return;
+            const acc = getAccounts();
+            const list = Object.keys(acc).map(n => {
+                const d = acc[n] || {};
+                return { name: n, points: d.points || 0, grade: d.grade || '', role: d.role, avatar: d.avatar };
+            }).sort((a, b) => b.points - a.points);
+            if (!list.length) { box.innerHTML = '<div class="rank-empty">暂无用户，登录后答题即可上榜</div>'; return; }
+            box.innerHTML = list.map((u, i) => {
+                const rank = i + 1;
+                let badge = '';
+                if (rank === 1) badge = '<span class="rb rb-gold">🥇 金牌</span>';
+                else if (rank <= 5) badge = '<span class="rb rb-top5">🏅 全前五奖状</span>';
+                else if (rank <= 10) badge = '<span class="rb rb-top10">🎯 前十小目标奖励</span>';
+                const medal = rank <= 3 ? ['🥇', '🥈', '🥉'][rank - 1] : rank;
+                const av = (allSkins().find(s => s.id === u.avatar) || {}).emoji || '🙂';
+                return '<div class="rank-row ' + (u.name === userName ? 'me' : '') + '">' +
+                    '<div class="rank-no">' + medal + '</div>' +
+                    '<div class="rank-av">' + av + '</div>' +
+                    '<div class="rank-info">' +
+                        '<div class="rank-name">' + esc(u.name) + (u.name === userName ? '（我）' : '') + '</div>' +
+                        '<div class="rank-grade">' + (u.grade || '—') + ' · ' + (u.role === 'teacher' ? '老师' : '学生') + '</div>' +
+                        (badge ? '<div class="rank-badges">' + badge + '</div>' : '') +
+                    '</div>' +
+                    '<div class="rank-pts">' + u.points + '</div>' +
+                '</div>';
+            }).join('');
+        }
+
+        function renderMySkins() {
+            const box = document.getElementById('mySkins');
+            if (!box) return;
+            const m = me();
+            if (!m || !(m.skins || []).length) { box.innerHTML = ''; return; }
+            box.innerHTML = '<div style="font-size:12px;color:var(--muted);margin-top:12px">我的皮肤</div>' +
+                '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">' +
+                (m.skins || []).map(id => {
+                    const s = allSkins().find(x => x.id === id) || {};
+                    return '<span style="font-size:22px;padding:4px 10px;border-radius:12px;background:rgba(255,255,255,.85);border:1px solid var(--line)" title="' + (s.name || '') + '">' + (s.emoji || '🎆') + '</span>';
+                }).join('') + '</div>';
+        }
+
+        /* ================= 答题赚积分 ================= */
+        let quiz = null;
+        function shuffle(a) {
+            const r = a.slice();
+            for (let i = r.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                const t = r[i]; r[i] = r[j]; r[j] = t;
+            }
+            return r;
+        }
+        function cnOf(w) {
+            const d = dict[w];
+            if (!d || !d.cn) return '';
+            return String(d.cn).split(/[；;，,、/]/)[0].trim();
+        }
+        function pickDistractors(pool, word, right, count, level) {
+            let cand = pool.filter(x => x !== word && cnOf(x) !== right);
+            if (level >= 2) {
+                const pos = (dict[word] && dict[word].pos) || '';
+                const same = cand.filter(x => (((dict[x] || {}).pos) || '') === pos);
+                if (same.length >= count) cand = same;
+            }
+            if (level >= 3) {
+                const len = word.length;
+                cand = cand.slice()
+                    .sort((a, b) => Math.abs(a.length - len) - Math.abs(b.length - len))
+                    .slice(0, Math.max(count * 3, 12));
+            }
+            const list = shuffle(cand).map(cnOf).filter(x => x && x !== right);
+            const uniq = [];
+            list.forEach(x => { if (uniq.indexOf(x) < 0) uniq.push(x); });
+            return uniq.slice(0, count);
+        }
+        function startQuiz() {
+            if (!userName) { toast('请先登录后再答题'); openLogin(); return; }
+            const pool = allLessonWords().filter(w => analyzeWord(w).known && cnOf(w));
+            if (pool.length < 10) { toast('7 篇课文中可用于答题的单词不足'); return; }
+            const picked = shuffle(pool).slice(0, 6);
+            const qs = picked.map((w, i) => {
+                const level = Math.floor(i / 2) + 1;
+                const right = cnOf(w);
+                const nOpt = level === 1 ? 3 : (level === 2 ? 4 : 5);
+                const others = pickDistractors(pool, w, right, nOpt - 1, level);
+                return { w: w, right: right, level: level, opts: shuffle([right].concat(others)) };
+            });
+            quiz = { qs: qs, idx: 0, score: 0, done: false };
+            document.getElementById('quizModal').style.display = 'flex';
+            renderQuiz();
+        }
+        function renderQuiz() {
+            const body = document.getElementById('quizBody');
+            if (!quiz) return;
+            const m = me() || {};
+            if (quiz.done) {
+                body.innerHTML = '<div class="quiz-done">' +
+                    '<div class="quiz-score">' + quiz.score + ' 分</div>' +
+                    '<div style="font-size:13px;color:var(--muted);margin-top:8px">共 ' + quiz.qs.length +
+                    ' 题，答对 ' + quiz.score + ' 题（每题 1 分）· 已自动转为积分</div>' +
+                    '<div style="font-size:13px;color:var(--muted);margin-top:4px">当前总积分：' + (m.points || 0) + '</div>' +
+                    '<button class="mod-btn" onclick="startQuiz()">再来一次</button></div>';
+                return;
+            }
+            const q = quiz.qs[quiz.idx];
+            const lvTxt = ['', '基础', '稍难', '更难', '挑战'][Math.min(q.level, 4)] || ('第' + q.level + '级');
+            body.innerHTML =
+                '<div class="quiz-hint">第 ' + (quiz.idx + 1) + ' / ' + quiz.qs.length +
+                ' 题 · 难度 ' + q.level + ' 级（' + lvTxt + '） · 当前积分 ' + (m.points || 0) + '</div>' +
+                '<div class="quiz-q">' + q.w + '</div>' +
+                '<div class="quiz-hint">请选择正确的中文意思（题目来自 7 篇课文）</div>' +
+                q.opts.map((o, i) => '<button class="quiz-opt" onclick="answerQuiz(' + i + ')">' + esc(o) + '</button>').join('');
+        }
+        function answerQuiz(i) {
+            if (!quiz || quiz.done) return;
+            const q = quiz.qs[quiz.idx];
+            if (q.opts[i] === q.right) { quiz.score += 1; toast('答对！+1 积分'); }
+            else toast('答错，正确答案：' + q.right);
+            quiz.idx++;
+            if (quiz.idx >= quiz.qs.length) finishQuiz(); else renderQuiz();
+        }
+        function finishQuiz() {
+            quiz.done = true;
+            const acc = getAccounts();
+            if (acc[userName]) {
+                acc[userName].points = (acc[userName].points || 0) + quiz.score;
+                setAccounts(acc);
+            }
+            renderRank(); renderUserModule();
+            toast('答题完成，获得 ' + quiz.score + ' 积分');
+            renderQuiz();
+        }
+
+        /* ================= 皮肤商店 ================= */
+        let skinTab = 'bg';
+        function openSkinShop() {
+            document.getElementById('skinModal').style.display = 'flex';
+            showSkinTab('bg');
+        }
+
+        /* ===== 日期时间：年 月 日 星期 详细时间 ===== */
+        const WEEK_CN = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+        function updateDateTime() {
+            const el = document.getElementById('datetime');
+            if (!el) return;
+            const d = new Date();
+            const p = n => (n < 10 ? '0' + n : '' + n);
+            el.textContent = d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' +
+                WEEK_CN[d.getDay()] + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+        }
+        setInterval(updateDateTime, 1000);
+        function showSkinTab(t) {
+            skinTab = t;
+            document.getElementById('tabBg').classList.toggle('active', t === 'bg');
+            document.getElementById('tabAv').classList.toggle('active', t === 'avatar');
+            const m = me() || {};
+            document.getElementById('shopPoints').textContent = m.points || 0;
+            const list = t === 'bg' ? BG_SKINS : AV_SKINS;
+            const owned = m.skins || [];
+            const usingId = t === 'bg' ? m.bg : m.avatar;
+            document.getElementById('skinGrid').innerHTML = list.map(s => {
+                const isOwned = owned.indexOf(s.id) >= 0;
+                const isUsing = usingId === s.id;
+                const prev = t === 'bg'
+                    ? '<div class="skin-prev" style="background:' + s.css + '"></div>'
+                    : '<div class="skin-prev" style="background:linear-gradient(135deg,var(--accent),var(--accent-2))">' + s.emoji + '</div>';
+                const btnTxt = isUsing ? '使用中' : (isOwned ? '使用' : '购买');
+                return '<div class="skin-card ' + (isOwned ? 'owned ' : '') + (isUsing ? 'using' : '') + '">' +
+                    prev +
+                    '<div class="skin-name">' + s.name + '</div>' +
+                    '<div class="skin-price">' + s.price + ' 积分</div>' +
+                    '<button class="skin-buy ' + (isOwned ? 'owned' : '') + '" onclick="buySkin(\'' + s.id + '\')">' + btnTxt + '</button>' +
+                '</div>';
+            }).join('');
+        }
+        function buySkin(id) {
+            if (!userName) { toast('请先登录后再用积分兑换皮肤'); return; }
+            const acc = getAccounts();
+            const m = acc[userName];
+            const s = allSkins().find(x => x.id === id);
+            if (!m || !s) return;
+            m.skins = m.skins || [];
+            if (m.skins.indexOf(id) < 0) {
+                if ((m.points || 0) < s.price) {
+                    toast('积分不足，还差 ' + (s.price - (m.points || 0)) + ' 积分');
+                    return;
+                }
+                m.points -= s.price;
+                m.skins.push(id);
+                toast('购买成功：' + s.name + '（-' + s.price + ' 积分）');
+            } else {
+                toast('已切换使用：' + s.name);
+            }
+            if (BG_SKINS.some(x => x.id === id)) m.bg = id; else m.avatar = id;
+            setAccounts(acc);
+            applySkins(); renderUserModule(); renderRank(); renderMySkins();
+            showSkinTab(skinTab);
+        }
+
+        function initTheme() {
+            setTheme(localStorage.getItem('theme') || 'mint');
+        }
+
+        function initPicker() {
+            const sel = document.getElementById('lessonSelect');
+            sel.innerHTML = lessons.map((l, i) => `<option value="${i}">${i + 1} · ${l.title} ${l.subtitle}</option>`).join('');
+        }
+
+        function switchLesson(i) {
+            current = i;
+            const l = lessons[i];
+            document.getElementById('lessonSelect').value = i;
+            const imgEl = document.getElementById('lessonImg');
+            if (l.img) {
+                imgEl.src = l.img;
+                imgEl.alt = l.title;
+                document.getElementById('normalView').style.display = posterMode ? 'none' : 'flex';
+            } else {
+                imgEl.removeAttribute('src');
+                document.getElementById('normalView').style.display = 'none';
+                resetBackdrop();
+            }
+            const pi = document.getElementById('posterImg');
+            if (l.img) {
+                pi.src = l.img;
+                pi.alt = l.title + ' 插图';
+                pi.style.display = '';
+            } else {
+                pi.removeAttribute('src');
+                pi.style.display = 'none';
+            }
+            let ph = document.getElementById('posterPlaceholder');
+            const pl = document.querySelector('.poster-left');
+            if (!l.img) {
+                if (!ph) {
+                    ph = document.createElement('div');
+                    ph.id = 'posterPlaceholder';
+                    ph.className = 'poster-fallback';
+                    pl.appendChild(ph);
+                }
+                ph.innerHTML = '该课文暂无配图<br><span style="font-size:12px">导入的课文直接显示正文</span>';
+                ph.style.display = '';
+            } else if (ph) { ph.style.display = 'none'; }
+            document.getElementById('posterText').innerHTML = esc(l.body).replace(/\n/g, '<br>');
+            marks = JSON.parse(localStorage.getItem('m' + i) || '[]');
+            annos = JSON.parse(localStorage.getItem('a' + i) || '[]');
+            render();
+            document.getElementById('detailBox').innerHTML =
+                '<div class="empty-hint" style="padding:34px 0">标记任意 4 字母以上单词<br>这里显示它的词性 / 前后缀 / 中文意思</div>';
+        }
+
+        function save() {
+            localStorage.setItem('m' + current, JSON.stringify(marks));
+            localStorage.setItem('a' + current, JSON.stringify(annos));
+        }
+
+        function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+        function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+        function render() {
+            let html = esc(lessons[current].body).replace(/\n/g, '<br>');
+            marks.forEach((m, i) => {
+                html = html.replace(new RegExp('(' + escRe(m.text) + ')', 'g'),
+                    `<span class="${m.type} ${mode === 'erase' ? 'erasable' : ''}" data-i="${i}" onclick="onMarkClick(${i},event)">$1</span>`);
+            });
+            document.getElementById('articleBody').innerHTML = html;
+            renderAnnos();
+            updateStats();
+            updateWordList();
+            renderWords();
+            renderTeacherStats();
+        }
+
+        function renderAnnos() {
+            const layer = document.getElementById('annoLayer');
+            layer.innerHTML = '';
+            annos.forEach((a, i) => {
+                const el = document.createElement('div');
+                if (a.type === 'circle') {
+                    el.className = 'anno-circle' + (mode === 'erase' ? ' erasable' : '');
+                    el.style.left = a.x + 'px'; el.style.top = a.y + 'px';
+                    el.style.width = a.w + 'px'; el.style.height = a.h + 'px';
+                } else {
+                    el.className = 'anno-sticky' + (mode === 'erase' ? ' erasable' : '');
+                    el.style.left = a.x + 'px'; el.style.top = a.y + 'px';
+                    el.contentEditable = true; el.textContent = a.text;
+                    el.oninput = () => { a.text = el.textContent; save(); updateStats(); };
+                    el.onmousedown = (e) => startDrag(e, el, a);
+                }
+                el.onclick = (e) => { if (mode === 'erase') { annos.splice(i, 1); save(); render(); toast('已删除该标注'); e.stopPropagation(); } };
+                layer.appendChild(el);
+            });
+        }
+
+        function setMode(m) {
+            mode = m;
+            document.querySelectorAll('.tool-btn[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+            const stage = document.getElementById('stage');
+            stage.className = 'stage ' + (m === 'circle' ? 'drawing' : m === 'sticky' ? 'sticky' : m === 'erase' ? 'erase' : '');
+            document.getElementById('annoLayer').className = 'anno-layer ' + (m === 'circle' || m === 'sticky' || m === 'erase' ? 'enabled' : '');
+            hidePopup();
+            render();
+            if (m === 'erase') toast('删除模式：点击任意标注即可删除');
+        }
+
+        function onTextSelect(e) {
+            if (mode !== 'text') return;
+            const s = window.getSelection();
+            if (!s.rangeCount || s.isCollapsed) { hidePopup(); return; }
+            const t = s.toString().trim();
+            if (!t) { hidePopup(); return; }
+            selRange = s.getRangeAt(0);
+            const r = selRange.getBoundingClientRect();
+            const wrap = document.querySelector('.stage-wrap').getBoundingClientRect();
+            const p = document.getElementById('popup');
+            p.style.display = 'flex';
+            p.style.left = Math.max(8, r.left - wrap.left + r.width / 2 - p.offsetWidth / 2) + 'px';
+            p.style.top = (r.bottom - wrap.top + 8) + 'px';
+        }
+
+        function hidePopup() { document.getElementById('popup').style.display = 'none'; selRange = null; }
+
+        function addMark(type) {
+            if (!selRange) return;
+            const t = selRange.toString().trim();
+            if (!t) return;
+            marks.push({ type, text: t });
+            save(); render(); hidePopup();
+            window.getSelection().removeAllRanges();
+            showDetail(marks.length - 1);
+            toast(type === 'vocab' ? '已加入生词表' : type === 'word' ? '已标为好词' : '已标为好句');
+        }
+
+        function onMarkClick(i, e) {
+            if (mode === 'erase') {
+                e.stopPropagation();
+                marks.splice(i, 1); save(); render(); toast('已删除该标记');
+            }
+        }
+
+        function onStageDown(e) {
+            if (mode !== 'circle' && mode !== 'sticky') return;
+            if (e.target.closest('.anno-sticky')) return;
+            const st = document.getElementById('stage').getBoundingClientRect();
+            const x = e.clientX - st.left, y = e.clientY - st.top;
+            if (mode === 'circle') {
+                circleStart = { x, y };
+                tempCircle = document.createElement('div');
+                tempCircle.className = 'anno-circle';
+                tempCircle.style.left = x + 'px'; tempCircle.style.top = y + 'px';
+                tempCircle.style.width = '0px'; tempCircle.style.height = '0px';
+                document.getElementById('annoLayer').appendChild(tempCircle);
+                document.addEventListener('mousemove', drawCircle);
+                document.addEventListener('mouseup', endCircle);
+            } else {
+                annos.push({ type: 'sticky', x, y, text: '便签：双击编辑' });
+                save(); renderAnnos(); updateStats();
+            }
+        }
+
+        function drawCircle(e) {
+            if (!tempCircle || !circleStart) return;
+            const st = document.getElementById('stage').getBoundingClientRect();
+            const x = e.clientX - st.left, y = e.clientY - st.top;
+            tempCircle.style.left = Math.min(x, circleStart.x) + 'px';
+            tempCircle.style.top = Math.min(y, circleStart.y) + 'px';
+            tempCircle.style.width = Math.abs(x - circleStart.x) + 'px';
+            tempCircle.style.height = Math.abs(y - circleStart.y) + 'px';
+        }
+
+        function endCircle() {
+            document.removeEventListener('mousemove', drawCircle);
+            document.removeEventListener('mouseup', endCircle);
+            if (tempCircle && circleStart) {
+                const w = parseFloat(tempCircle.style.width), h = parseFloat(tempCircle.style.height);
+                if (w > 15 && h > 15) {
+                    annos.push({ type: 'circle', x: parseFloat(tempCircle.style.left), y: parseFloat(tempCircle.style.top), w, h });
+                    save(); updateStats();
+                }
+                tempCircle.remove();
+            }
+            tempCircle = null; circleStart = null;
+            renderAnnos();
+        }
+
+        function startDrag(e, el, a) {
+            if (mode === 'erase') return;
+            e.preventDefault();
+            drag = { el, a, sx: e.clientX, sy: e.clientY, ox: parseFloat(el.style.left), oy: parseFloat(el.style.top) };
+            document.addEventListener('mousemove', doDrag);
+            document.addEventListener('mouseup', stopDrag);
+        }
+        function doDrag(e) {
+            if (!drag) return;
+            drag.el.style.left = (drag.ox + e.clientX - drag.sx) + 'px';
+            drag.el.style.top = (drag.oy + e.clientY - drag.sy) + 'px';
+            drag.a.x = drag.ox + e.clientX - drag.sx; drag.a.y = drag.oy + e.clientY - drag.sy;
+        }
+        function stopDrag() { if (drag) save(); drag = null; document.removeEventListener('mousemove', doDrag); document.removeEventListener('mouseup', stopDrag); }
+
+        function updateStats() {
+            document.getElementById('statVocab').textContent = marks.filter(m => m.type === 'vocab').length;
+            document.getElementById('statWord').textContent = marks.filter(m => m.type !== 'vocab').length;
+            document.getElementById('statAnno').textContent = annos.length;
+        }
+
+        function updateWordList() {
+            const box = document.getElementById('wordList');
+            const detail = document.getElementById('detailBox');
+            if (!marks.length) {
+                box.innerHTML = '<div class="empty-hint">选中课文中的单词 → 点「生词」<br>4 个字母以上的单词会自动解析</div>';
+                detail.innerHTML = '<div class="empty-hint" style="padding:34px 0">标记任意 4 字母以上单词<br>这里显示它的词性 / 前后缀 / 中文意思</div>';
+                return;
+            }
+            box.innerHTML = marks.map((m, i) => {
+                const cls = m.type === 'vocab' ? '' : m.type === 'word' ? 't-word' : 't-sentence';
+                const tag = m.type === 'vocab' ? '生词' : m.type === 'word' ? '好词' : '好句';
+                const tagHtml = `<span class="word-pos" style="background:rgba(255,143,163,.18);color:#c2417a">${tag}</span>`;
+                if (!isParseable(m.text)) {
+                    return `<div class="word-card ${cls}" onclick="showDetail(${i})">
+                        <div class="word-head"><span class="word-en">${esc(m.text)}</span>${tagHtml}</div>
+                        <div class="word-cn" style="color:var(--muted)">（不足 4 个字母，不解析）</div>
+                    </div>`;
+                }
+                const a = analyzeWord(m.text);
+                const key = m.text.toLowerCase().replace(/[^a-z]/g, '');
+                const def = kidDef(key, a);
+                const syn = kidSyn(key);
+                const ant = kidAnt(key);
+                return `<div class="word-card ${cls}" onclick="showDetail(${i})">
+                    <div class="word-head"><span class="word-en">${esc(m.text)}</span><span class="word-pos">${a.pos}</span>${tagHtml}</div>
+                    <div class="word-cn">${esc(def)}</div>
+                    <div class="word-affix"><b>词根词缀：</b>${a.affix}</div>
+                    <div class="word-affix"><b>近义词：</b>${syn ? syn.map(esc).join(' / ') : '—'}　<b>反义词：</b>${ant ? ant.map(esc).join(' / ') : '—'}</div>
+                </div>`;
+            }).join('');
+        }
+
+        function showDetail(i) {
+            const m = marks[i];
+            const box = document.getElementById('detailBox');
+            if (!m) return;
+            if (!isParseable(m.text)) {
+                box.innerHTML = `<div class="detail-word">${esc(m.text)}</div>
+                    <div class="detail-short">该标记不足 4 个字母，不生成词性与词缀解析。</div>`;
+                return;
+            }
+            const a = analyzeWord(m.text);
+            const tag = m.type === 'vocab' ? '生词' : m.type === 'word' ? '好词' : '好句';
+            const prefixTxt = a.prefix ? `${a.prefix.p}- （${a.prefix.m}）` : null;
+            const suffixTxt = a.suffix ? `-${a.suffix.s} （${a.suffix.m}）` : null;
+            const affixLine = a.known ? a.affix.replace(/<\/?b>/g, '')
+                : [prefixTxt ? '前缀 ' + prefixTxt : null, '词根 ' + (a.stem || '—'), suffixTxt ? '后缀 ' + suffixTxt : null]
+                    .filter(Boolean).join(' ＋ ');
+            const key = m.text.toLowerCase().replace(/[^a-z]/g, '');
+            const def = kidDef(key, a);
+            const syn = kidSyn(key);
+            const ant = kidAnt(key);
+            box.innerHTML = `
+                <div class="detail-word">${esc(m.text)}<span class="detail-pos">${a.pos}</span></div>
+                <div class="detail-row"><b>英文释义</b><span class="en-def">${esc(def)}</span></div>
+                <div class="detail-row"><b>词缀</b>${affixLine}</div>
+                <div class="detail-row"><b>近义词</b>${exListHtml(syn, 'syn')}</div>
+                <div class="detail-row"><b>反义词</b>${exListHtml(ant, 'ant')}</div>
+                <span class="detail-tag">${tag}</span>`;
+        }
+
+        function downloadFile(name, content, type) {
+            const blob = new Blob([content], { type: type || 'text/plain;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = name;
+            a.click();
+        }
+
+        function saveNow() {
+            save();
+            const data = {
+                lessonIndex: current,
+                title: lessons[current].title,
+                subtitle: lessons[current].subtitle,
+                savedAt: new Date().toLocaleString('zh-CN'),
+                marks, annos
+            };
+            downloadFile('标记存档_' + lessons[current].title + '.json', JSON.stringify(data, null, 2), 'application/json');
+            toast('已保存：浏览器 + 存档文件');
+        }
+
+        function exportVocab() {
+            if (!marks.length) { toast('还没有标记内容'); return; }
+            const lines = [`【${lessons[current].title} ${lessons[current].subtitle}】生词表`, ''];
+            marks.forEach(m => {
+                if (!isParseable(m.text)) { lines.push(`${m.text}   （不足 4 个字母，未解析）`); return; }
+                const a = analyzeWord(m.text);
+                lines.push(`${m.text}   ${a.pos}   ${a.cn}`);
+                lines.push(`    词根词缀：${a.affix.replace(/<\/?b>/g, '')}`);
+            });
+            downloadFile('生词表_' + lessons[current].title + '.txt', lines.join('\n'));
+            toast('已导出');
+        }
+
+        function clearAll() {
+            if (!marks.length && !annos.length) return;
+            if (!confirm('确定清空当前课文的所有标记吗？')) return;
+            marks = []; annos = []; save(); render(); toast('已清空');
+        }
+
+        function toast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg; t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 1800);
+        }
+
+        document.addEventListener('click', e => {
+            const p = document.getElementById('popup');
+            if (p.style.display === 'flex' && !p.contains(e.target)) hidePopup();
+        });
+
+        initTheme();
+        initPicker();
+        switchLesson(0);
+        initLogin();
+        renderUserModule(); renderRank(); renderMySkins();
+        loadUi(); updateSaveInfo(); updateDateTime();
+    </script>
+</body>
+</html>
